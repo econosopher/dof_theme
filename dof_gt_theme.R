@@ -72,7 +72,7 @@ theme_dof_gt <- function(gt_table,
     # Table options
     tab_options(
       # Font settings
-      table.font.names = dof_font_family,
+      table.font.names = dof_font_body,
       table.font.size = px(12),
       
       # Header styling

@@ -284,7 +284,7 @@ create_dof_example_chart <- function() {
     coord_flip() +
     labs(
       title = "Mobile Gaming Dominates Platform Revenue in 2024",
-      subtitle = "Traditional platforms like mobile, console, and PC still drive most revenue, while emerging tech like VR and cloud gaming remain small",
+      subtitle = "Traditional platforms like mobile, console, and PC still drive most revenue,\nwhile emerging tech like VR and cloud gaming remain small",
       x = NULL,  # Remove axis labels for 538-style
       y = NULL,  # Remove axis labels for 538-style  
       fill = "Platform Type",
