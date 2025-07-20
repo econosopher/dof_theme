@@ -5,6 +5,19 @@ library(ggplot2)
 library(png)
 library(grid)
 library(scales)
+library(gridExtra)
+
+# Load magick for image-based post-processing
+if (!require(magick, quietly = TRUE)) {
+  cat("Installing magick package for image processing...\n")
+  install.packages("magick")
+  library(magick)
+} else {
+  library(magick)
+}
+
+# Prevent automatic Rplot.pdf generation
+options(device = function(...) png(tempfile(), ...))
 
 # Font setup - DoF font hierarchy
 # Primary: Agrandir (titles)
@@ -37,35 +50,14 @@ dof_font_title <- "sans"      # Agrandir for titles
 dof_font_subtitle <- "sans"   # Inter Tight for subtitles
 dof_font_body <- "sans"       # Poppins for axis labels/UI
 
-tryCatch({
-  if (require(extrafont, quietly = TRUE)) {
-    available_fonts <- fonts()
-    
-    # Check for Agrandir (titles)
-    agrandir_fonts <- available_fonts[grepl("Agrandir", available_fonts, ignore.case = TRUE)]
-    if (length(agrandir_fonts) > 0) {
-      dof_font_title <- agrandir_fonts[1]
-    }
-    
-    # Check for Inter Tight (subtitles)
-    inter_fonts <- available_fonts[grepl("Inter.*Tight", available_fonts, ignore.case = TRUE)]
-    if (length(inter_fonts) > 0) {
-      dof_font_subtitle <- inter_fonts[1]
-    } else {
-      # Fallback to any Inter variant
-      inter_any <- available_fonts[grepl("Inter", available_fonts, ignore.case = TRUE)]
-      if (length(inter_any) > 0) {
-        dof_font_subtitle <- inter_any[1]
-      }
-    }
-    
-    # Check for Poppins (body/axis text)
-    poppins_fonts <- available_fonts[grepl("Poppins", available_fonts, ignore.case = TRUE)]
-    if (length(poppins_fonts) > 0) {
-      dof_font_body <- poppins_fonts[1]
-    }
-  }
-}, error = function(e) invisible())
+# Temporarily disabled custom fonts to avoid crashes
+# TODO: Re-enable once font compatibility issues are resolved
+# tryCatch({
+#   if (require(extrafont, quietly = TRUE)) {
+#     available_fonts <- fonts()
+#     # ... font detection code ...
+#   }
+# }, error = function(e) invisible())
 
 # Backward compatibility
 dof_font_family <- dof_font_title
@@ -96,26 +88,40 @@ dof_palette <- function(type = "main", reverse = FALSE) {
   colors
 }
 
-# Custom ggplot2 theme
-theme_dof <- function(base_size = 12, logo_alpha = 0.1) {
-  theme_minimal(base_size = base_size) +
+# Helper function to automatically convert titles to uppercase (538-style)
+format_title_538 <- function(title) {
+  if (is.null(title) || title == "") return(title)
+  toupper(title)
+}
+
+# Custom ggplot2 theme with 538-inspired bold, uppercase titles
+theme_dof <- function(base_size = 12, logo_alpha = 0.1, border = TRUE, border_color = NULL, 
+                      uppercase_titles = TRUE) {
+  
+  # Set default border color to DoF primary pink
+  if (is.null(border_color)) {
+    border_color <- dof_colors$primary
+  }
+  
+  # Base theme with border
+  base_theme <- theme_minimal(base_size = base_size) +
     theme(
       # Text styling with DoF font hierarchy
       text = element_text(color = dof_colors$secondary, family = dof_font_body),
       plot.title = element_text(
-        size = base_size * 1.5,  # Larger like 538
+        size = base_size * 2.2,  # Much larger for commanding presence (26px at base 12)
         color = dof_colors$secondary,
         face = "bold",
         family = dof_font_title,  # Agrandir Variable
         hjust = 0,  # Left-aligned like 538
-        margin = margin(b = 20)
+        margin = margin(l = -15, b = 10)  # Negative left margin to align with plot area
       ),
       plot.subtitle = element_text(
         size = base_size * 1.1,
         color = dof_colors$grey_dark,
         family = dof_font_subtitle,  # Inter Tight
         hjust = 0,  # Left-aligned like title
-        margin = margin(b = 15)
+        margin = margin(l = -15, b = 5)  # Matching negative left margin
       ),
       
       # Axis styling with Poppins (538-inspired: minimal approach)
@@ -136,8 +142,12 @@ theme_dof <- function(base_size = 12, logo_alpha = 0.1) {
       ),
       panel.grid.minor = element_blank(),
       
-      # Background
-      plot.background = element_rect(fill = "white", color = NA),
+      # Background with DoF pink border
+      plot.background = element_rect(
+        fill = "white", 
+        color = if (border) border_color else NA,
+        linewidth = if (border) 3 else 0
+      ),
       panel.background = element_rect(fill = "white", color = NA),
       
       # Legend styling with Poppins (538-inspired positioning)
@@ -169,71 +179,418 @@ theme_dof <- function(base_size = 12, logo_alpha = 0.1) {
         color = NA
       ),
       
-      # 538-inspired plot margins for clean spacing
-      plot.margin = margin(t = 25, r = 25, b = 25, l = 25)
+      # Adjusted plot margins to accommodate border and logo strip
+      plot.margin = margin(t = 25, r = 25, b = 80, l = 25)
     )
+    
+  return(base_theme)
 }
 
-# Function to add DoF logo watermark
-add_dof_logo <- function(plot, logo_path = NULL, alpha = 0.15) {
+# DoF Chart Container System - Image-Based Post-Processing
+# This creates branded charts using magick for precise image manipulation
+
+# Helper function to detect optimal dimensions based on plot content
+detect_optimal_dimensions <- function(plot) {
+  # Extract plot data and layers for analysis
+  plot_data <- tryCatch({
+    if (is_ggplot(plot)) {
+      list(
+        layers = length(plot$layers),
+        facets = !is.null(plot$facet),
+        has_legend = !identical(plot$guides$colour, "none") || !identical(plot$guides$fill, "none"),
+        coord_type = class(plot$coordinates)[1]
+      )
+    } else {
+      list(layers = 1, facets = FALSE, has_legend = FALSE, coord_type = "CoordCartesian")
+    }
+  }, error = function(e) {
+    list(layers = 1, facets = FALSE, has_legend = FALSE, coord_type = "CoordCartesian")
+  })
   
-  # Auto-detect logo path based on current working directory
-  if (is.null(logo_path)) {
-    possible_paths <- c(
-      "Images/Wordmark/03_Horizontal Layout/Wordmark_Horizontal_Primary Color.png",
-      "../Images/Wordmark/03_Horizontal Layout/Wordmark_Horizontal_Primary Color.png"
+  # Base dimensions
+  base_width <- 1200
+  base_height <- 800
+  
+  # Adjust for plot complexity
+  if (plot_data$facets) {
+    base_width <- base_width * 1.3
+    base_height <- base_height * 1.2
+  }
+  
+  if (plot_data$has_legend) {
+    base_height <- base_height + 60
+  }
+  
+  if (plot_data$coord_type == "CoordFlip") {
+    # Swap dimensions for flipped coordinates
+    temp <- base_width
+    base_width <- base_height * 1.1
+    base_height <- temp * 0.9
+  }
+  
+  return(list(width = round(base_width), height = round(base_height)))
+}
+
+# Helper function to calculate adaptive margins based on plot characteristics
+calculate_adaptive_margins <- function(plot, width, height, logo_strip, strip_height_px) {
+  # Base margins
+  base_margin <- 20
+  
+  # Analyze plot for margin requirements
+  plot_info <- tryCatch({
+    if (is_ggplot(plot)) {
+      list(
+        has_title = !is.null(plot$labels$title) && plot$labels$title != "",
+        has_subtitle = !is.null(plot$labels$subtitle) && plot$labels$subtitle != "",
+        facets = !is.null(plot$facet),
+        coord_type = class(plot$coordinates)[1]
+      )
+    } else {
+      list(has_title = FALSE, has_subtitle = FALSE, facets = FALSE, coord_type = "CoordCartesian")
+    }
+  }, error = function(e) {
+    list(has_title = FALSE, has_subtitle = FALSE, facets = FALSE, coord_type = "CoordCartesian")
+  })
+  
+  # Calculate adaptive margins
+  top_margin <- base_margin
+  if (plot_info$has_title) top_margin <- top_margin + 10
+  if (plot_info$has_subtitle) top_margin <- top_margin + 5
+  
+  # Adjust for facets
+  if (plot_info$facets) {
+    top_margin <- top_margin + 15
+  }
+  
+  # Bottom margin depends on logo strip
+  bottom_margin <- if (logo_strip) 5 else base_margin
+  
+  # Side margins scale with width
+  side_margin <- max(base_margin, width * 0.02)
+  
+  return(list(
+    top = top_margin,
+    right = side_margin,
+    bottom = bottom_margin,
+    left = side_margin
+  ))
+}
+
+create_dof_container <- function(plot, 
+                                 logo_strip = TRUE,
+                                 logo_path = NULL, 
+                                 icon_path = NULL,
+                                 logo_color = "primary",     # Options: "primary", "secondary", "black", "white"
+                                 icon_color = "primary",     # Options: "primary", "secondary", "black", "white"
+                                 strip_height_px = 45,       # Thinner logo strip for better proportions
+                                 strip_color = NULL,
+                                 container_border = TRUE,
+                                 border_color = NULL,
+                                 border_width = 9,
+                                 width = NULL,              # Auto-detect if NULL
+                                 height = NULL,             # Auto-detect if NULL
+                                 dpi = 150) {               # Higher DPI for better quality
+  
+  # Validate inputs
+  if (!is_ggplot(plot)) {
+    stop("Input must be a ggplot object")
+  }
+  
+  # Check magick availability
+  if (!requireNamespace("magick", quietly = TRUE)) {
+    warning("magick package not available. Install with: install.packages('magick')")
+    return(plot)  # Return original plot
+  }
+  
+  # Auto-detect dimensions if not provided
+  if (is.null(width) || is.null(height)) {
+    # Default responsive dimensions based on plot type and data
+    default_dims <- detect_optimal_dimensions(plot)
+    if (is.null(width)) width <- default_dims$width
+    if (is.null(height)) height <- default_dims$height
+  }
+  
+  # Validate dimensions
+  if (width < 300 || height < 200) {
+    warning("Dimensions too small, using minimum sizes")
+    width <- max(width, 600)
+    height <- max(height, 400)
+  }
+  
+  # Set default colors
+  if (is.null(strip_color)) {
+    strip_color <- dof_colors$primary
+  }
+  if (is.null(border_color)) {
+    border_color <- dof_colors$primary
+  }
+  
+  # Adaptive margin system based on plot complexity
+  plot_margins <- calculate_adaptive_margins(plot, width, height, logo_strip, strip_height_px)
+  
+  # Create a clean plot with adaptive margins
+  clean_plot <- plot + theme_dof(border = FALSE) +  # No border on ggplot itself
+    theme(
+      plot.margin = margin(t = plot_margins$top, r = plot_margins$right, 
+                          b = plot_margins$bottom, l = plot_margins$left),
+      panel.spacing = unit(0, "pt"),                        # No panel spacing
+      plot.background = element_rect(fill = "white", color = NA),
+      panel.background = element_rect(fill = "white", color = NA)
+    )
+  
+  # Safe file operations with error handling
+  temp_plot_file <- tempfile(fileext = ".png")
+  
+  tryCatch({
+    # Calculate chart dimensions (accounting for logo strip if needed)
+    chart_height <- if (logo_strip) height - strip_height_px else height
+    
+    ggsave(temp_plot_file, clean_plot, 
+           width = width/100, height = chart_height/100, 
+           units = "in", dpi = 100, bg = "white")
+    
+    # Validate file was created
+    if (!file.exists(temp_plot_file)) {
+      stop("Failed to create temporary plot file")
+    }
+    
+    # Load the chart image with validation
+    chart_img <- magick::image_read(temp_plot_file)
+    
+  }, error = function(e) {
+    if (file.exists(temp_plot_file)) unlink(temp_plot_file)
+    stop(paste("Error creating plot image:", e$message))
+  })
+  
+  # Resize to exact dimensions with validation
+  tryCatch({
+    chart_img <- magick::image_resize(chart_img, paste0(width, "x", chart_height, "!"))
+    
+    # Create final canvas with full dimensions
+    final_height <- height
+    canvas <- magick::image_blank(width, final_height, color = "white")
+    
+    # Add the chart to the canvas
+    canvas <- magick::image_composite(canvas, chart_img, offset = "+0+0")
+    
+    # Add logo strip if requested
+    if (logo_strip) {
+      canvas <- add_dof_logo_strip_image(canvas, logo_path, icon_path, strip_color, 
+                                         strip_height_px, width, logo_color, icon_color)
+    }
+    
+    # Add border if requested
+    if (container_border) {
+      canvas <- magick::image_border(canvas, border_color, 
+                            paste0(border_width, "x", border_width))
+    }
+    
+  }, error = function(e) {
+    warning(paste("Error in image processing:", e$message))
+    # Return a basic bordered plot as fallback
+    return(plot + theme_dof(border = container_border, border_color = border_color))
+  }, finally = {
+    # Always clean up temporary file
+    if (file.exists(temp_plot_file)) unlink(temp_plot_file)
+  })
+  
+  return(canvas)
+}
+
+# Image-based logo strip creation using magick with robust error handling
+add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL, 
+                                    strip_color = NULL, strip_height_px = 45, 
+                                    canvas_width = 1200, logo_color = "primary", 
+                                    icon_color = "primary") {
+  
+  # Validate inputs
+  if (!requireNamespace("magick", quietly = TRUE)) {
+    warning("magick package not available. Returning original canvas.")
+    return(canvas)
+  }
+  
+  # Set default strip color
+  if (is.null(strip_color)) {
+    strip_color <- dof_colors$primary
+  }
+  
+  # Robust logo path detection with color-specific patterns
+  find_asset_path <- function(asset_type = "logo", color = "primary") {
+    # Convert color names to match file naming convention
+    color_map <- list(
+      "primary" = "Primary Color",
+      "secondary" = "Secondary Color", 
+      "black" = "Black",
+      "white" = "White"
     )
     
-    logo_path <- NULL
-    for (path in possible_paths) {
-      if (file.exists(path)) {
-        logo_path <- path
-        break
+    file_color <- color_map[[tolower(color)]]
+    if (is.null(file_color)) file_color <- "Primary Color"  # fallback
+    
+    if (asset_type == "logo") {
+      search_patterns <- c(
+        paste0("*", file_color, "*"),
+        paste0("*Horizontal*", file_color, "*"),
+        "*Horizontal*", 
+        "*horizontal*",
+        "wordmark*horizontal*", 
+        "logo*horizontal*",
+        "logo*"
+      )
+      search_dirs <- c(
+        "images/Wordmark/03_Horizontal Layout",
+        "../images/Wordmark/03_Horizontal Layout", 
+        "Images/Wordmark/03_Horizontal Layout",
+        "../Images/Wordmark/03_Horizontal Layout",
+        "images/Wordmark",
+        "../images/Wordmark",
+        "Images/Wordmark",
+        "../Images/Wordmark", 
+        "images",
+        "../images",
+        "Images",
+        "../Images",
+        "assets/images",
+        "../assets/images"
+      )
+    } else {
+      search_patterns <- c(
+        paste0("*", file_color, "*"),
+        "*Primary*",
+        "*primary*",
+        "icon*primary*",
+        "icon*"
+      )
+      search_dirs <- c(
+        "images/Icon",
+        "../images/Icon",
+        "Images/Icon",
+        "../Images/Icon", 
+        "images",
+        "../images",
+        "Images",
+        "../Images",
+        "assets/images",
+        "../assets/images"
+      )
+    }
+    
+    for (dir in search_dirs) {
+      if (dir.exists(dir)) {
+        for (pattern in search_patterns) {
+          files <- list.files(dir, pattern = pattern, ignore.case = TRUE, full.names = TRUE)
+          if (length(files) > 0) {
+            return(files[1])  # Return first match
+          }
+        }
       }
     }
+    return(NULL)
+  }
+  
+  # Auto-detect logo path with color-specific fallbacks
+  if (is.null(logo_path)) {
+    logo_path <- find_asset_path("logo", logo_color)
+  }
+  
+  # Auto-detect icon path with color-specific fallbacks  
+  if (is.null(icon_path)) {
+    icon_path <- find_asset_path("icon", icon_color)
+  }
+  
+  # Create pink background strip
+  strip_bg <- image_blank(canvas_width, strip_height_px, color = strip_color)
+  
+  # Calculate positioning - much simpler with pixel coordinates!
+  icon_margin <- 40        # 40px from left edge
+  logo_margin <- 40        # 40px from right edge
+  icon_size <- 40          # Icon height in pixels (smaller for better proportions)
+  logo_height <- 28        # Logo height in pixels (smaller for better proportions)
+  
+  # Add icon on the left if available
+  if (file.exists(icon_path)) {
+    icon_img <- image_read(icon_path)
     
-    if (is.null(logo_path)) {
-      logo_path <- "Images/Wordmark/03_Horizontal Layout/Wordmark_Horizontal_Primary Color.png"
-    }
+    # Resize icon to desired height while maintaining aspect ratio
+    icon_info <- image_info(icon_img)
+    icon_aspect <- icon_info$width / icon_info$height
+    icon_width <- round(icon_size * icon_aspect)
+    icon_img <- image_resize(icon_img, paste0(icon_width, "x", icon_size, "!"))
+    
+    # Get actual dimensions after resize for precise centering
+    resized_icon_info <- image_info(icon_img)
+    actual_icon_height <- resized_icon_info$height
+    
+    # Calculate vertical center position using actual image height
+    icon_y <- round((strip_height_px - actual_icon_height) / 2)
+    
+    # Ensure minimum offset to prevent clipping
+    icon_y <- max(icon_y, 1)
+    
+    # Composite icon onto strip
+    strip_bg <- image_composite(strip_bg, icon_img, 
+                               offset = paste0("+", icon_margin, "+", icon_y))
   }
   
-  # Check if logo file exists
-  if (!file.exists(logo_path)) {
-    warning("Logo file not found. Skipping logo overlay.")
-    return(plot)
-  }
-  
-  # Read logo and apply transparency
-  logo_img <- readPNG(logo_path)
-  
-  # Apply alpha to the logo
-  if (dim(logo_img)[3] == 4) {
-    # Logo already has alpha channel
-    logo_img[, , 4] <- logo_img[, , 4] * alpha
+  # Add logo on the right if available
+  if (file.exists(logo_path)) {
+    logo_img <- image_read(logo_path)
+    
+    # Resize logo to desired height while maintaining aspect ratio
+    logo_info <- image_info(logo_img)
+    logo_aspect <- logo_info$width / logo_info$height
+    logo_width <- round(logo_height * logo_aspect)
+    logo_img <- image_resize(logo_img, paste0(logo_width, "x", logo_height, "!"))
+    
+    # Get actual dimensions after resize for precise centering
+    resized_logo_info <- image_info(logo_img)
+    actual_logo_height <- resized_logo_info$height
+    actual_logo_width <- resized_logo_info$width
+    
+    # Calculate positions (right-aligned and vertically centered using actual dimensions)
+    logo_x <- canvas_width - actual_logo_width - logo_margin
+    logo_y <- round((strip_height_px - actual_logo_height) / 2)
+    
+    # Ensure minimum offset to prevent clipping
+    logo_y <- max(logo_y, 1)
+    logo_x <- max(logo_x, 0)
+    
+    # Composite logo onto strip
+    strip_bg <- image_composite(strip_bg, logo_img, 
+                               offset = paste0("+", logo_x, "+", logo_y))
   } else {
-    # Add alpha channel
-    logo_with_alpha <- array(1, dim = c(dim(logo_img)[1], dim(logo_img)[2], 4))
-    logo_with_alpha[, , 1:3] <- logo_img
-    logo_with_alpha[, , 4] <- alpha
-    logo_img <- logo_with_alpha
+    warning("Logo file not found.")
   }
   
-  # Create raster grob with proper aspect ratio
-  logo_grob <- rasterGrob(
-    logo_img, 
-    interpolate = TRUE,
-    x = unit(0.95, "npc"),
-    y = unit(0.05, "npc"),
-    height = unit(0.96, "cm"),
-    just = c("right", "bottom")
-  )
+  # Get canvas dimensions
+  canvas_info <- image_info(canvas)
+  canvas_height <- canvas_info$height
   
-  # Add logo to plot 
-  plot +
-    annotation_custom(
-      logo_grob,
-      xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = Inf
-    )
+  # Calculate position for logo strip (bottom of canvas)
+  strip_y <- canvas_height - strip_height_px
+  
+  # Composite the logo strip onto the bottom of the canvas
+  result <- image_composite(canvas, strip_bg, 
+                           offset = paste0("+0+", strip_y))
+  
+  return(result)
+}
+
+# Backward compatibility function - now uses image-based approach
+add_dof_logo_strip <- function(plot, logo_path = NULL, strip_height = 0.075, 
+                               strip_color = NULL, width = 1200, height = 800) {
+  # Convert strip_height proportion to pixels
+  strip_height_px <- round(height * strip_height)
+  
+  create_dof_container(
+    plot = plot,
+    logo_strip = TRUE,
+    logo_path = logo_path,
+    strip_height_px = strip_height_px,
+    strip_color = strip_color,
+    width = width,
+    height = height
+  )
 }
 
 # Scale functions for consistent DoF colors
@@ -266,8 +623,69 @@ format_dof_millions <- function(x, accuracy = 0.1) {
   dollar(x, suffix = "M", scale = 1e-6, accuracy = accuracy)
 }
 
+# Smart GT-table style formatting functions
+format_dof_smart_currency <- function(x, accuracy = NULL) {
+  sapply(x, function(val) {
+    if (is.na(val)) return(NA)
+    
+    abs_val <- abs(val)
+    
+    if (abs_val >= 1e9) {
+      # Billions
+      acc <- ifelse(is.null(accuracy), 0.1, accuracy)
+      format_val <- dollar(val, suffix = "B", scale = 1e-9, accuracy = acc)
+    } else if (abs_val >= 1e6) {
+      # Millions
+      acc <- ifelse(is.null(accuracy), 0.1, accuracy)
+      format_val <- dollar(val, suffix = "M", scale = 1e-6, accuracy = acc)
+    } else if (abs_val >= 1e3) {
+      # Thousands
+      acc <- ifelse(is.null(accuracy), 1, accuracy)
+      format_val <- dollar(val, suffix = "K", scale = 1e-3, accuracy = acc)
+    } else if (abs_val < 100) {
+      # Small values (like ARPDAU) - always show 2 decimal places
+      acc <- ifelse(is.null(accuracy), 0.01, accuracy)
+      format_val <- dollar(val, accuracy = acc)
+    } else {
+      # Regular values ($100-$999)
+      acc <- ifelse(is.null(accuracy), 1, accuracy)
+      format_val <- dollar(val, accuracy = acc)
+    }
+    
+    return(format_val)
+  })
+}
+
+format_dof_smart_number <- function(x, accuracy = NULL) {
+  sapply(x, function(val) {
+    if (is.na(val)) return(NA)
+    
+    abs_val <- abs(val)
+    
+    if (abs_val >= 1e9) {
+      # Billions
+      acc <- ifelse(is.null(accuracy), 0.1, accuracy)
+      format_val <- number(val, suffix = "B", scale = 1e-9, accuracy = acc)
+    } else if (abs_val >= 1e6) {
+      # Millions
+      acc <- ifelse(is.null(accuracy), 0.1, accuracy)
+      format_val <- number(val, suffix = "M", scale = 1e-6, accuracy = acc)
+    } else if (abs_val >= 1e3) {
+      # Thousands
+      acc <- ifelse(is.null(accuracy), 1, accuracy)
+      format_val <- number(val, suffix = "K", scale = 1e-3, accuracy = acc)
+    } else {
+      # Regular
+      acc <- ifelse(is.null(accuracy), 1, accuracy)
+      format_val <- number(val, accuracy = acc)
+    }
+    
+    return(format_val)
+  })
+}
+
 # Example chart demonstrating the theme
-create_dof_example_chart <- function() {
+create_dof_example_chart <- function(save_path = NULL) {
   # Sample gaming industry data
   gaming_data <- data.frame(
     platform = c("Mobile", "Console", "PC", "VR", "Cloud"),
@@ -276,14 +694,14 @@ create_dof_example_chart <- function() {
     category = c("Traditional", "Traditional", "Traditional", "Emerging", "Emerging")
   )
   
-  # Create the plot
+  # Create the plot with new border and logo strip
   p <- ggplot(gaming_data, aes(x = reorder(platform, revenue_billions), y = revenue_billions)) +
     geom_col(aes(fill = category), width = 0.7) +
     scale_fill_dof("purple_pink") +
     scale_y_continuous(labels = format_dof_billions, expand = c(0, 0, 0.1, 0)) +
     coord_flip() +
     labs(
-      title = "Mobile Gaming Dominates Platform Revenue in 2024",
+      title = "MOBILE GAMING DOMINATES PLATFORM REVENUE IN 2024",
       subtitle = "Traditional platforms like mobile, console, and PC still drive most revenue,\nwhile emerging tech like VR and cloud gaming remain small",
       x = NULL,  # Remove axis labels for 538-style
       y = NULL,  # Remove axis labels for 538-style  
@@ -301,19 +719,212 @@ create_dof_example_chart <- function() {
       )
     )
   
-  return(p)
+  # Create the image-based container with logo strip
+  result_image <- create_dof_container(p, width = 1200, height = 800)
+  
+  # Save if path provided
+  if (!is.null(save_path)) {
+    image_write(result_image, save_path)
+    cat("Chart with border and logo strip saved as '", save_path, "'\n", sep = "")
+  }
+  
+  return(result_image)
 }
 
-# Print example usage
-cat("DoF Theme Loaded! 🎮\n")
-cat("Font hierarchy:\n")
-cat("  • Titles:", dof_font_title, "\n")
-cat("  • Subtitles:", dof_font_subtitle, "\n") 
-cat("  • Body/Axis:", dof_font_body, "\n")
-cat("Colors available:", paste(names(dof_colors), collapse = ", "), "\n")
-cat("Usage:\n")
-cat("  your_plot + theme_dof()\n")
-cat("  your_plot + scale_fill_dof('main')\n")
-cat("  add_dof_logo(your_plot)\n")
-cat("  create_dof_example_chart()\n")
-cat("  install_dof_fonts()  # Install fonts to system\n")
+# Line chart example with reference line
+create_dof_line_chart <- function(save_path = NULL) {
+  # Generate sample daily revenue data for popular games over 30 days
+  set.seed(42)  # For reproducible data
+  dates <- seq(from = Sys.Date() - 29, to = Sys.Date(), by = "day")
+  
+  # Create realistic daily revenue data for different games
+  games_data <- expand.grid(
+    date = dates,
+    game = c("Fortnite", "Roblox", "Genshin Impact", "PUBG Mobile", "Candy Crush")
+  )
+  
+  # Generate revenue with different patterns for each game
+  games_data$daily_revenue <- sapply(1:nrow(games_data), function(i) {
+    game <- games_data$game[i]
+    day_num <- as.numeric(games_data$date[i] - min(games_data$date)) + 1
+    
+    base_revenue <- switch(as.character(game),
+      "Fortnite" = 850000,
+      "Roblox" = 720000, 
+      "Genshin Impact" = 950000,
+      "PUBG Mobile" = 680000,
+      "Candy Crush" = 520000
+    )
+    
+    # Add trend and seasonality
+    trend <- base_revenue * (1 + (day_num - 15) * 0.01)
+    seasonality <- sin(day_num * 2 * pi / 7) * base_revenue * 0.1  # Weekly pattern
+    noise <- rnorm(1, 0, base_revenue * 0.05)
+    
+    max(trend + seasonality + noise, 0)
+  })
+  
+  # Calculate overall average for reference line
+  overall_avg <- mean(games_data$daily_revenue)
+  
+  # Create the line plot
+  p <- ggplot(games_data, aes(x = date, y = daily_revenue, color = game)) +
+    geom_smooth(method = "loess", se = FALSE, linewidth = 1.2, alpha = 0.8) +
+    geom_point(size = 2, alpha = 0.7) +
+    geom_hline(yintercept = overall_avg, linetype = "solid", 
+               color = dof_colors$grey_light, linewidth = 0.5, alpha = 0.8) +
+    annotate("text", x = max(games_data$date), y = overall_avg,
+             label = paste0("Avg: ", format_dof_smart_currency(overall_avg)),
+             color = dof_colors$grey_dark, size = 3, family = dof_font_body,
+             hjust = 1.1, vjust = -0.5, fontface = "plain") +
+    scale_color_dof("full") +
+    scale_y_continuous(labels = format_dof_smart_currency, expand = c(0, 0, 0.05, 0)) +
+    scale_x_date(date_labels = "%b %d", date_breaks = "1 week") +
+    labs(
+      title = "DAILY MOBILE GAME REVENUE TRENDS OVER 30 DAYS",
+      subtitle = "Fortnite and Genshin Impact lead in daily revenue generation,\\nwith clear weekly patterns visible across all titles",
+      x = NULL,
+      y = NULL,
+      color = "Game Title",
+      caption = "Deconstructor of Fun • Mobile Gaming Revenue Analysis"
+    ) +
+    theme_dof(base_size = 12) +
+    theme(
+      plot.caption = element_text(
+        color = dof_colors$grey_dark,
+        size = 10,
+        hjust = 1,
+        family = dof_font_subtitle,
+        margin = margin(t = 15)
+      ),
+      axis.text.x = element_text(angle = 45, hjust = 1)
+    )
+  
+  # Create the image-based container with logo strip
+  result_image <- create_dof_container(p, width = 1200, height = 800)
+  
+  # Save if path provided
+  if (!is.null(save_path)) {
+    image_write(result_image, save_path)
+    cat("Line chart with border and logo strip saved as '", save_path, "'\\n", sep = "")
+  }
+  
+  return(result_image)
+}
+
+# Stacked bar chart example
+create_dof_stacked_chart <- function(save_path = NULL) {
+  # Generate sample data for different game genres by platform
+  stacked_data <- data.frame(
+    platform = rep(c("Mobile", "Console", "PC", "VR"), each = 4),
+    genre = rep(c("Action", "Strategy", "RPG", "Casual"), 4),
+    revenue_millions = c(
+      # Mobile
+      12500, 8200, 15300, 9800,
+      # Console  
+      8900, 3200, 11200, 2100,
+      # PC
+      7800, 5900, 9200, 1800,
+      # VR
+      420, 180, 680, 290
+    )
+  )
+  
+  # Create the stacked bar plot
+  p <- ggplot(stacked_data, aes(x = platform, y = revenue_millions, fill = genre)) +
+    geom_col(width = 0.7, alpha = 0.9) +
+    scale_fill_dof("full") +
+    scale_y_continuous(labels = function(x) paste0("$", round(x/1000, 1), "B"), 
+                       expand = c(0, 0, 0.05, 0)) +
+    labs(
+      title = "GAMING REVENUE BY PLATFORM AND GENRE IN 2024",
+      subtitle = "Mobile gaming dominates across all genres, with RPG and Action\\ngames generating the highest revenue per platform",
+      x = NULL,
+      y = NULL,
+      fill = "Game Genre",
+      caption = "Deconstructor of Fun • Gaming Industry Analysis"
+    ) +
+    theme_dof(base_size = 12) +
+    theme(
+      plot.caption = element_text(
+        color = dof_colors$grey_dark,
+        size = 10,
+        hjust = 1,
+        family = dof_font_subtitle,
+        margin = margin(t = 15)
+      )
+    )
+  
+  # Create the image-based container with logo strip
+  result_image <- create_dof_container(p, width = 1200, height = 800)
+  
+  # Save if path provided
+  if (!is.null(save_path)) {
+    image_write(result_image, save_path)
+    cat("Stacked bar chart with border and logo strip saved as '", save_path, "'\\n", sep = "")
+  }
+  
+  return(result_image)
+}
+
+# 100% stacked bar chart example
+create_dof_100_stacked_chart <- function(save_path = NULL) {
+  # Generate sample data for monetization models by platform
+  monetization_data <- data.frame(
+    platform = rep(c("Mobile", "Console", "PC", "VR"), each = 4),
+    model = rep(c("Free-to-Play", "Premium", "Subscription", "Ad-Supported"), 4),
+    percentage = c(
+      # Mobile
+      65, 15, 12, 8,
+      # Console
+      25, 55, 15, 5,
+      # PC  
+      35, 40, 20, 5,
+      # VR
+      30, 60, 8, 2
+    )
+  )
+  
+  # Create the 100% stacked bar plot
+  p <- ggplot(monetization_data, aes(x = platform, y = percentage, fill = model)) +
+    geom_col(width = 0.7, alpha = 0.9, position = "fill") +
+    geom_text(aes(label = paste0(percentage, "%")), 
+              position = position_fill(vjust = 0.5),
+              color = "white",
+              size = 3.5,
+              fontface = "bold",
+              family = dof_font_body) +
+    scale_fill_dof("full") +
+    scale_y_continuous(labels = percent_format(), expand = c(0, 0, 0.02, 0)) +
+    labs(
+      title = "MONETIZATION MODEL DISTRIBUTION BY PLATFORM 2024",
+      subtitle = "Free-to-play dominates mobile while premium sales lead console gaming,\\nsubscription models gaining traction across all platforms",
+      x = NULL,
+      y = NULL,
+      fill = "Monetization Model",
+      caption = "Deconstructor of Fun • Gaming Business Model Analysis"
+    ) +
+    theme_dof(base_size = 12) +
+    theme(
+      plot.caption = element_text(
+        color = dof_colors$grey_dark,
+        size = 10,
+        hjust = 1,
+        family = dof_font_subtitle,
+        margin = margin(t = 15)
+      )
+    )
+  
+  # Create the image-based container with logo strip
+  result_image <- create_dof_container(p, width = 1200, height = 800)
+  
+  # Save if path provided
+  if (!is.null(save_path)) {
+    image_write(result_image, save_path)
+    cat("100% stacked bar chart with border and logo strip saved as '", save_path, "'\\n", sep = "")
+  }
+  
+  return(result_image)
+}
+
+# Theme loaded successfully - no output messages

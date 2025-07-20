@@ -1,124 +1,91 @@
-# DoF Theme
+# Deconstructor of Fun ggplot2 & GT Themes
 
-Custom ggplot2 and GT table themes for the Deconstructor of Fun podcast.
+Professional R themes for the Deconstructor of Fun podcast with branded colors, fonts, and chart containers.
 
-## Project Structure
-
-```
-dof_theme/
-├── dof_theme.R          # Main ggplot2 theme
-├── dof_gt_theme.R       # GT table theme
-├── README.md
-├── examples/            # Example scripts
-│   ├── example_chart.R  # ggplot2 example
-│   ├── example_table.R  # GT table example
-│   ├── run_all_examples.R # Run all examples
-│   └── output/          # Generated outputs
-├── Images/              # Brand assets
-└── style_guide/         # Official style guide
-    ├── colors.png
-    ├── font.png
-    └── fonts/
-        ├── Agrandir.ttf
-        ├── Inter_Tight/
-        └── Poppins/
-```
+![DoF Example Chart](examples/output/example_chart.png)
 
 ## Quick Start
 
-### ggplot2 Theme
 ```r
-# Load the theme
+# Load themes
 source("dof_theme.R")
-
-# Create a basic plot with DoF styling
-your_plot + theme_dof()
-
-# Use DoF color palette
-your_plot + scale_fill_dof("main")
-
-# Add logo watermark
-add_dof_logo(your_plot)
-
-# See example
-create_dof_example_chart()
-```
-
-### GT Table Theme
-```r
-# Load the GT theme
 source("dof_gt_theme.R")
 
-# Apply DoF styling to a GT table
-your_table %>% theme_dof_gt()
+# Create branded ggplot2 chart with pink border and logo strip
+your_plot + theme_dof() %>%
+  create_dof_container(logo_color = "primary", icon_color = "primary")
 
-# See example
-create_dof_example_table()
+# Create branded GT table with optional border
+your_table %>% theme_dof_gt(container_border = TRUE)
 ```
 
-## Official Brand Colors
+## Example Code
+
+The chart above was generated with:
+
+```r
+# Load the DoF theme
+source("dof_theme.R")
+
+# Create sample data
+gaming_data <- data.frame(
+  platform = c("Mobile", "Console", "PC", "VR", "Cloud"),
+  revenue_billions = c(93.2, 50.4, 36.7, 6.2, 3.7),
+  category = c("Traditional", "Traditional", "Traditional", "Emerging", "Emerging")
+)
+
+# Create the plot
+p <- ggplot(gaming_data, aes(x = reorder(platform, revenue_billions), y = revenue_billions)) +
+  geom_col(aes(fill = category), width = 0.7) +
+  scale_fill_dof("purple_pink") +
+  scale_y_continuous(labels = format_dof_billions, expand = c(0, 0, 0.1, 0)) +
+  coord_flip() +
+  labs(
+    title = "MOBILE GAMING DOMINATES PLATFORM REVENUE IN 2024",
+    subtitle = "Traditional platforms like mobile, console, and PC still drive most revenue,\nwhile emerging tech like VR and cloud gaming remain small",
+    fill = "Platform Type"
+  ) +
+  theme_dof()
+
+# Add DoF container with pink border and logo strip
+result <- create_dof_container(p, width = 1200, height = 800)
+```
+
+## Logo Color Options
+
+Customize logo and icon colors:
+
+```r
+create_dof_container(
+  plot, 
+  logo_color = "black",     # "primary", "secondary", "black", "white"
+  icon_color = "white"      # "primary", "secondary", "black", "white"
+)
+```
+
+## Brand Colors
 
 - **Primary**: #FF66A5 (Galactic Magenta)
-- **Secondary**: #0F0D4F (Midnight Indigo)  
+- **Secondary**: #0F0D4F (Midnight Indigo) 
 - **Accent**: #4F00EB (Pac(Man) Purple)
 
-## Available Functions
+## Installation
 
-### ggplot2 Theme (`dof_theme.R`)
-- `theme_dof()` - Custom ggplot2 theme
-- `scale_color_dof()` / `scale_fill_dof()` - DoF color scales
-- `add_dof_logo()` - Add logo watermark to plots
-- `format_dof_*()` - Number formatting functions
-- `create_dof_example_chart()` - Example chart
+```r
+# Install required packages
+install.packages(c("ggplot2", "gt", "magick", "scales", "dplyr"))
 
-### GT Table Theme (`dof_gt_theme.R`)
-- `theme_dof_gt()` - Custom GT table theme
-- `style_dof_*()` - Conditional formatting styles
-- `create_dof_example_table()` - Example table
+# Clone or download this repository
+# Source the theme files in your R script
+```
 
 ## Running Examples
 
 ```bash
-# Run from the examples folder
 cd examples
 Rscript run_all_examples.R
 ```
 
-This will generate outputs in `examples/output/`:
-- `dof_example_chart_with_logo.png` - ggplot2 chart
-- `dof_example_table.html` - GT table
-
-## Font Hierarchy
-
-The DoF themes use a sophisticated font hierarchy:
-
-- **Titles**: Agrandir Variable (primary brand font)
-- **Subtitles**: Inter Tight (clean, readable secondary text)  
-- **Body/Axis/Data**: Poppins (UI elements and data display)
-
-### Font Installation
-
-To enable the full font hierarchy:
-
-1. **Install fonts to system** (automatic helper included):
-```r
-source("dof_theme.R")
-install_dof_fonts()  # Installs fonts from style_guide/fonts/ to system
-```
-
-2. **Enable fonts in R**:
-```r
-install.packages("extrafont")
-library(extrafont)
-font_import()  # Import all system fonts (may take a few minutes)
-loadfonts()    # Load fonts for R
-```
-
-3. **Restart R** and reload the theme to see the fonts in action.
-
-**Included fonts**:
-- `style_guide/fonts/Agrandir.ttf` (Titles)
-- `style_guide/fonts/Inter_Tight/` (Subtitles) 
-- `style_guide/fonts/Poppins/` (Body/Data)
-
-**Note**: Themes gracefully fallback to system fonts if custom fonts aren't available.
+Outputs saved to `examples/output/`:
+- `example_chart.png` - Branded ggplot2 chart
+- `example_table.png` - Branded GT table

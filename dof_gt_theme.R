@@ -21,40 +21,13 @@ if (file.exists("dof_theme.R")) {
     grey_dark = "#424242"
   )
   
-  # Font setup - use same hierarchy as main theme
-  dof_font_title <- "sans"
-  dof_font_subtitle <- "sans"
-  dof_font_body <- "sans"
+  # Font setup - DoF font hierarchy with CSS-compatible font stacks
+  dof_font_title <- "'Agrandir', 'Arial Black', 'Helvetica Neue', sans-serif"
+  dof_font_subtitle <- "'Inter Tight', 'Inter', 'Helvetica Neue', sans-serif" 
+  dof_font_body <- "'Poppins', 'Helvetica Neue', 'Arial', sans-serif"
   
-  tryCatch({
-    if (require(extrafont, quietly = TRUE)) {
-      available_fonts <- fonts()
-      
-      # Check for Agrandir (titles)
-      agrandir_fonts <- available_fonts[grepl("Agrandir", available_fonts, ignore.case = TRUE)]
-      if (length(agrandir_fonts) > 0) {
-        dof_font_title <- agrandir_fonts[1]
-      }
-      
-      # Check for Inter Tight (subtitles)
-      inter_fonts <- available_fonts[grepl("Inter.*Tight", available_fonts, ignore.case = TRUE)]
-      if (length(inter_fonts) > 0) {
-        dof_font_subtitle <- inter_fonts[1]
-      } else {
-        # Fallback to any Inter variant
-        inter_any <- available_fonts[grepl("Inter", available_fonts, ignore.case = TRUE)]
-        if (length(inter_any) > 0) {
-          dof_font_subtitle <- inter_any[1]
-        }
-      }
-      
-      # Check for Poppins (body/data text)
-      poppins_fonts <- available_fonts[grepl("Poppins", available_fonts, ignore.case = TRUE)]
-      if (length(poppins_fonts) > 0) {
-        dof_font_body <- poppins_fonts[1]
-      }
-    }
-  }, error = function(e) invisible())
+  # Temporarily disabled custom fonts to avoid crashes
+  # TODO: Re-enable once font compatibility issues are resolved
   
   # Use body font as default for tables
   dof_font_family <- dof_font_body
@@ -66,13 +39,16 @@ theme_dof_gt <- function(gt_table,
                          header_text = dof_colors$white,
                          stripe_color = dof_colors$grey_light,
                          border_color = dof_colors$grey_light,
-                         text_color = dof_colors$secondary) {
+                         text_color = dof_colors$secondary,
+                         container_border = FALSE,
+                         container_border_color = dof_colors$primary,
+                         container_border_width = 3) {
   
-  gt_table %>%
+  result_table <- gt_table %>%
     # Table options
     tab_options(
-      # Font settings
-      table.font.names = dof_font_body,
+      # Font settings - use Poppins for table body
+      table.font.names = dof_font_body,  # Full font stack
       table.font.size = px(12),
       
       # Header styling
@@ -111,7 +87,7 @@ theme_dof_gt <- function(gt_table,
         cell_text(
           color = header_text,
           weight = "bold",
-          font = dof_font_body  # Poppins for headers
+          font = dof_font_body  # Poppins font stack for headers
         )
       ),
       locations = cells_column_labels(everything())
@@ -122,7 +98,7 @@ theme_dof_gt <- function(gt_table,
       style = list(
         cell_text(
           color = text_color,
-          font = dof_font_body  # Poppins for data
+          font = dof_font_body  # Poppins font stack for data
         )
       ),
       locations = cells_body()
@@ -153,6 +129,17 @@ style_dof_highlight <- function() {
 
 # Example DoF GT table
 create_dof_example_table <- function() {
+  # Check for required packages
+  if (!requireNamespace("gt", quietly = TRUE)) {
+    stop("Package 'gt' is required. Install with: install.packages('gt')")
+  }
+  if (!requireNamespace("dplyr", quietly = TRUE)) {
+    stop("Package 'dplyr' is required. Install with: install.packages('dplyr')")
+  }
+  if (!requireNamespace("htmltools", quietly = TRUE)) {
+    stop("Package 'htmltools' is required. Install with: install.packages('htmltools')")
+  }
+  
   # Sample gaming data
   gaming_table_data <- data.frame(
     Platform = c("Mobile", "Console", "PC", "VR", "Cloud Gaming"),
@@ -167,33 +154,35 @@ create_dof_example_table <- function() {
   gt_table <- gaming_table_data %>%
     gt() %>%
     
-    # Apply DoF theme
+    # Apply DoF theme  
     theme_dof_gt() %>%
     
-    # Add title and subtitle with font hierarchy
+    # Add title and subtitle (538-style bold, uppercase)
     tab_header(
-      title = md("**Gaming Platform Performance 2024**"),
+      title = md("**GAMING PLATFORM PERFORMANCE 2024**"),
       subtitle = "Revenue, growth, and market share analysis"
     ) %>%
     
-    # Style title with Agrandir
+    # Style title with Agrandir (bold, uppercase)
     tab_style(
       style = list(
         cell_text(
-          font = dof_font_title,  # Agrandir for title
+          font = dof_font_title,      # Agrandir font stack
           weight = "bold",
-          size = px(18)
+          size = px(18),
+          color = dof_colors$secondary
         )
       ),
       locations = cells_title("title")
     ) %>%
     
-    # Style subtitle with Inter Tight
+    # Style subtitle with Inter Tight  
     tab_style(
       style = list(
         cell_text(
-          font = dof_font_subtitle,  # Inter Tight for subtitle
-          size = px(14)
+          font = dof_font_subtitle,    # Inter Tight font stack
+          size = px(14),
+          color = dof_colors$grey_dark
         )
       ),
       locations = cells_title("subtitle")
@@ -231,10 +220,53 @@ create_dof_example_table <- function() {
       )
     ) %>%
     
-    # Add source note
+    # Add source note 
     tab_source_note(
       source_note = "Deconstructor of Fun • Gaming Industry Analysis 2024"
     ) %>%
+    
+    # Add custom CSS to ensure fonts are properly applied and container borders
+    {
+      # Build CSS outside pipe context
+      base_css <- "
+        .gt_title {
+          font-family: 'Agrandir', 'Arial Black', 'Helvetica Neue', sans-serif !important;
+        }
+        .gt_subtitle {
+          font-family: 'Inter Tight', 'Inter', 'Helvetica Neue', sans-serif !important;
+        }
+        .gt_col_heading, .gt_column_spanner, .gt_sourcenote, .gt_row {
+          font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
+        }
+        table, .gt_table {
+          font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
+        }
+        /* Fallback for all text elements */
+        * {
+          font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
+        }
+        /* Ensure font loading fallbacks work */
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap');
+      "
+      
+      # Add border CSS if requested
+      if (container_border) {
+        border_css <- paste0("
+          /* DoF Container Border */
+          .gt_table {
+            border: ", container_border_width, "px solid ", container_border_color, " !important;
+            border-radius: 0 !important;
+          }
+        ")
+        final_css <- paste0(base_css, border_css)
+      } else {
+        final_css <- base_css
+      }
+      
+      # Apply CSS using the built string
+      opt_css(css = final_css)
+    } %>%
     
     # Column groups
     tab_spanner(
@@ -242,7 +274,8 @@ create_dof_example_table <- function() {
       columns = c(`Revenue (Billions)`, `Growth Rate (%)`, `Market Share (%)`)
     )
   
-  return(gt_table)
+  # Return the result
+  return(result_table)
 }
 
 # Print usage information

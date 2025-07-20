@@ -1,42 +1,55 @@
 # Deconstructor of Fun Theme Examples
 # Run all examples and generate outputs
 
-cat("🎮 Deconstructor of Fun Theme Examples\n")
-cat("=====================================\n\n")
-
 # Create output directory if it doesn't exist
 if (!dir.exists("output")) {
-  dir.create("output")
+  dir.create("output", recursive = TRUE)
 }
 
-# 1. Run ggplot2 chart example
-cat("📊 Creating ggplot2 chart example...\n")
+# Clean up old output files before generating new ones
+old_files <- list.files("output", full.names = TRUE)
+if (length(old_files) > 0) {
+  file.remove(old_files)
+}
+
+# Original bar chart
 tryCatch({
   source("example_chart.R")
-  cat("✅ Chart example completed successfully\n\n")
+  # Bar chart completed
 }, error = function(e) {
-  cat("❌ Chart example failed:", e$message, "\n\n")
+  stop("Bar chart example failed: ", e$message)
 })
 
-# 2. Run GT table example  
-cat("📋 Creating GT table example...\n")
+# Line chart
+tryCatch({
+  source("example_line_chart.R")
+  # Line chart completed
+}, error = function(e) {
+  stop("Line chart example failed: ", e$message)
+})
+
+# Stacked bar chart
+tryCatch({
+  source("example_stacked_bar_chart.R")
+  # Stacked bar chart completed
+}, error = function(e) {
+  stop("Stacked bar chart example failed: ", e$message)
+})
+
+# 100% stacked bar chart
+tryCatch({
+  source("example_100_stacked_bar_chart.R")
+  # 100% stacked bar chart completed
+}, error = function(e) {
+  stop("100% stacked bar chart example failed: ", e$message)
+})
+
+# 2. Run GT table example
 tryCatch({
   source("example_table.R")
-  cat("✅ Table example completed successfully\n\n")
+  # Table example completed
 }, error = function(e) {
-  cat("❌ Table example failed:", e$message, "\n\n")
+  stop("Table example failed: ", e$message)
 })
 
-# 3. List generated outputs
-cat("📁 Generated outputs:\n")
-output_files <- list.files("output", full.names = TRUE)
-if (length(output_files) > 0) {
-  for (file in output_files) {
-    cat("  •", basename(file), "\n")
-  }
-} else {
-  cat("  No output files found\n")
-}
-
-cat("\n🎉 All examples completed!\n")
-cat("View outputs in the examples/output/ folder\n")
+# Examples completed

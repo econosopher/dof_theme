@@ -7,7 +7,7 @@ if (!require(gt, quietly = TRUE)) {
   cat("Skipping table example.\n")
 } else {
   # Load the GT theme (from parent directory)
-  source("../dof_gt_theme.R")
+  source("dof_gt_theme.R")
   
   # Create and display the example table
   example_table <- create_dof_example_table()
@@ -15,8 +15,8 @@ if (!require(gt, quietly = TRUE)) {
   # Display the table
   print(example_table)
   
-  # Save the table as HTML to output folder
-  gtsave(example_table, "output/dof_example_table.html")
+  # Save the table as PNG to output folder
+  gtsave(example_table, "examples/output/example_table.png")
   
-  cat("Table saved as 'output/dof_example_table.html'\n")
+  cat("Table saved as 'examples/output/example_table.png'\n")
 }
