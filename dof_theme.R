@@ -602,87 +602,26 @@ scale_fill_dof <- function(type = "main", ...) {
   scale_fill_manual(values = dof_palette(type), ...)
 }
 
-# DoF number formatting functions
-format_dof_currency <- function(x, prefix = "$", suffix = "", accuracy = 0.1) {
-  dollar(x, prefix = prefix, suffix = suffix, accuracy = accuracy)
+# Use scales package label_dollar and label_number for smart formatting
+# The scales package already handles K/M/B formatting automatically
+
+# For backwards compatibility, map old function names to scales functions
+format_dof_currency <- label_dollar()
+format_dof_number <- label_number(big.mark = ",")
+format_dof_percent <- label_percent(accuracy = 0.1)
+format_dof_billions <- label_dollar(suffix = "B", scale = 1e-9, accuracy = 0.1)
+format_dof_millions <- label_dollar(suffix = "M", scale = 1e-6, accuracy = 0.1)
+
+# Custom formatter for small values (ARPDAU, etc) with 2 decimal places
+format_dof_smart_currency <- function(x) {
+  # Use label_dollar with custom logic for small values
+  ifelse(abs(x) < 100 & abs(x) > 0,
+         dollar(x, accuracy = 0.01),  # 2 decimals for small values
+         label_dollar(accuracy = NULL, scale_cut = cut_short_scale())(x))  # Auto K/M/B
 }
 
-format_dof_number <- function(x, accuracy = 1, suffix = "") {
-  number(x, accuracy = accuracy, suffix = suffix, big.mark = ",")
-}
-
-format_dof_percent <- function(x, accuracy = 0.1) {
-  percent(x, accuracy = accuracy)
-}
-
-format_dof_billions <- function(x, accuracy = 0.1) {
-  dollar(x, suffix = "B", scale = 1e-9, accuracy = accuracy)
-}
-
-format_dof_millions <- function(x, accuracy = 0.1) {
-  dollar(x, suffix = "M", scale = 1e-6, accuracy = accuracy)
-}
-
-# Smart GT-table style formatting functions
-format_dof_smart_currency <- function(x, accuracy = NULL) {
-  sapply(x, function(val) {
-    if (is.na(val)) return(NA)
-    
-    abs_val <- abs(val)
-    
-    if (abs_val >= 1e9) {
-      # Billions
-      acc <- ifelse(is.null(accuracy), 0.1, accuracy)
-      format_val <- dollar(val, suffix = "B", scale = 1e-9, accuracy = acc)
-    } else if (abs_val >= 1e6) {
-      # Millions
-      acc <- ifelse(is.null(accuracy), 0.1, accuracy)
-      format_val <- dollar(val, suffix = "M", scale = 1e-6, accuracy = acc)
-    } else if (abs_val >= 1e3) {
-      # Thousands
-      acc <- ifelse(is.null(accuracy), 1, accuracy)
-      format_val <- dollar(val, suffix = "K", scale = 1e-3, accuracy = acc)
-    } else if (abs_val < 100) {
-      # Small values (like ARPDAU) - always show 2 decimal places
-      acc <- ifelse(is.null(accuracy), 0.01, accuracy)
-      format_val <- dollar(val, accuracy = acc)
-    } else {
-      # Regular values ($100-$999)
-      acc <- ifelse(is.null(accuracy), 1, accuracy)
-      format_val <- dollar(val, accuracy = acc)
-    }
-    
-    return(format_val)
-  })
-}
-
-format_dof_smart_number <- function(x, accuracy = NULL) {
-  sapply(x, function(val) {
-    if (is.na(val)) return(NA)
-    
-    abs_val <- abs(val)
-    
-    if (abs_val >= 1e9) {
-      # Billions
-      acc <- ifelse(is.null(accuracy), 0.1, accuracy)
-      format_val <- number(val, suffix = "B", scale = 1e-9, accuracy = acc)
-    } else if (abs_val >= 1e6) {
-      # Millions
-      acc <- ifelse(is.null(accuracy), 0.1, accuracy)
-      format_val <- number(val, suffix = "M", scale = 1e-6, accuracy = acc)
-    } else if (abs_val >= 1e3) {
-      # Thousands
-      acc <- ifelse(is.null(accuracy), 1, accuracy)
-      format_val <- number(val, suffix = "K", scale = 1e-3, accuracy = acc)
-    } else {
-      # Regular
-      acc <- ifelse(is.null(accuracy), 1, accuracy)
-      format_val <- number(val, accuracy = acc)
-    }
-    
-    return(format_val)
-  })
-}
+# For non-currency numbers
+format_dof_smart_number <- label_number(accuracy = NULL, scale_cut = cut_short_scale())
 
 # Example chart demonstrating the theme
 create_dof_example_chart <- function(save_path = NULL) {
