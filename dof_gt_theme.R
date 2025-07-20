@@ -33,6 +33,30 @@ if (file.exists("dof_theme.R")) {
   dof_font_family <- dof_font_body
 }
 
+# Helper function to find DoF icon path
+find_dof_icon_path <- function() {
+  search_dirs <- c(
+    "../images/Icon",
+    "../Images/Icon", 
+    "../images",
+    "../Images",
+    "images/Icon",
+    "Images/Icon",
+    "images",
+    "Images"
+  )
+  
+  for (dir in search_dirs) {
+    if (dir.exists(dir)) {
+      files <- list.files(dir, pattern = "*Primary*|*primary*", ignore.case = TRUE, full.names = TRUE)
+      if (length(files) > 0) {
+        return(files[1])
+      }
+    }
+  }
+  return("")
+}
+
 # DoF GT theme function
 theme_dof_gt <- function(gt_table, 
                          header_bg = dof_colors$secondary,
@@ -40,7 +64,7 @@ theme_dof_gt <- function(gt_table,
                          stripe_color = dof_colors$grey_light,
                          border_color = dof_colors$grey_light,
                          text_color = dof_colors$secondary,
-                         container_border = FALSE,
+                         container_border = TRUE,
                          container_border_color = dof_colors$primary,
                          container_border_width = 3) {
   
@@ -50,6 +74,10 @@ theme_dof_gt <- function(gt_table,
       # Font settings - use Poppins for table body
       table.font.names = dof_font_body,  # Full font stack
       table.font.size = px(12),
+      
+      # Reduce heading padding
+      heading.padding = px(2),
+      heading.border.bottom.style = "none",
       
       # Header styling
       column_labels.background.color = header_bg,
@@ -62,11 +90,17 @@ theme_dof_gt <- function(gt_table,
       
       # Borders
       table.border.top.style = "solid",
-      table.border.top.width = px(2),
-      table.border.top.color = header_bg,
+      table.border.top.width = if (container_border) px(container_border_width) else px(2),
+      table.border.top.color = if (container_border) container_border_color else header_bg,
       table.border.bottom.style = "solid",
-      table.border.bottom.width = px(2),
-      table.border.bottom.color = header_bg,
+      table.border.bottom.width = if (container_border) px(container_border_width) else px(2),
+      table.border.bottom.color = if (container_border) container_border_color else header_bg,
+      table.border.left.style = if (container_border) "solid" else "none",
+      table.border.left.width = if (container_border) px(container_border_width) else px(0),
+      table.border.left.color = if (container_border) container_border_color else "transparent",
+      table.border.right.style = if (container_border) "solid" else "none",
+      table.border.right.width = if (container_border) px(container_border_width) else px(0),
+      table.border.right.color = if (container_border) container_border_color else "transparent",
       
       # Row striping
       row.striping.background_color = stripe_color,
@@ -163,27 +197,31 @@ create_dof_example_table <- function() {
       subtitle = "Revenue, growth, and market share analysis"
     ) %>%
     
-    # Style title with Agrandir (bold, uppercase)
+    # Style title with Agrandir (bold, uppercase, left-aligned) - matching charts
     tab_style(
       style = list(
         cell_text(
           font = dof_font_title,      # Agrandir font stack
           weight = "bold",
-          size = px(18),
-          color = dof_colors$secondary
-        )
+          size = px(18),              # Proportional to table size
+          color = dof_colors$secondary,
+          align = "left"
+        ),
+        cell_fill(color = "white")
       ),
       locations = cells_title("title")
     ) %>%
     
-    # Style subtitle with Inter Tight  
+    # Style subtitle with Inter Tight (left-aligned) - matching charts
     tab_style(
       style = list(
         cell_text(
           font = dof_font_subtitle,    # Inter Tight font stack
-          size = px(14),
-          color = dof_colors$grey_dark
-        )
+          size = px(13),               # Match chart subtitle size (base 12 * 1.1)
+          color = dof_colors$grey_dark,
+          align = "left"
+        ),
+        cell_fill(color = "white")
       ),
       locations = cells_title("subtitle")
     ) %>%
@@ -220,7 +258,7 @@ create_dof_example_table <- function() {
       )
     ) %>%
     
-    # Add source note 
+    # Add source note without image for better PNG compatibility
     tab_source_note(
       source_note = "Deconstructor of Fun • Gaming Industry Analysis 2024"
     )
@@ -229,19 +267,30 @@ create_dof_example_table <- function() {
   base_css <- "
     .gt_title {
       font-family: 'Agrandir', 'Arial Black', 'Helvetica Neue', sans-serif !important;
+      padding-bottom: 2px !important;
+      margin-bottom: 0px !important;
     }
     .gt_subtitle {
       font-family: 'Inter Tight', 'Inter', 'Helvetica Neue', sans-serif !important;
+      padding-top: 0px !important;
+      margin-top: 0px !important;
     }
-    .gt_col_heading, .gt_column_spanner, .gt_sourcenote, .gt_row {
+    .gt_heading {
+      padding-bottom: 5px !important;
+    }
+    .gt_col_heading, .gt_column_spanner {
+      font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
+    }
+    .gt_sourcenote, .gt_row {
       font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
     }
     table, .gt_table {
       font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
     }
-    /* Fallback for all text elements */
-    * {
-      font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
+    /* Source note styling to match charts */
+    .gt_sourcenote {
+      color: #0F0D4F !important;
+      font-weight: 500 !important;
     }
     /* Ensure font loading fallbacks work */
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');

@@ -114,15 +114,17 @@ theme_dof <- function(base_size = 12, logo_alpha = 0.1, border = TRUE, border_co
         face = "bold",
         family = dof_font_title,  # Agrandir Variable
         hjust = 0,  # Left-aligned like 538
-        margin = margin(l = -15, b = 10)  # Negative left margin to align with plot area
+        margin = margin(l = 0, b = 5, t = 0)  # Reduced margins for tighter spacing
       ),
+      plot.title.position = "plot",  # Align with entire plot area
       plot.subtitle = element_text(
         size = base_size * 1.1,
         color = dof_colors$grey_dark,
         family = dof_font_subtitle,  # Inter Tight
         hjust = 0,  # Left-aligned like title
-        margin = margin(l = -15, b = 5)  # Matching negative left margin
+        margin = margin(l = 0, b = 15)  # Increased bottom margin for more space
       ),
+      plot.subtitle.position = "plot",  # Align with entire plot area
       
       # Axis styling with Poppins (538-inspired: minimal approach)
       axis.title = element_blank(),  # Remove axis titles like 538
@@ -253,9 +255,9 @@ calculate_adaptive_margins <- function(plot, width, height, logo_strip, strip_he
   })
   
   # Calculate adaptive margins
-  top_margin <- base_margin
-  if (plot_info$has_title) top_margin <- top_margin + 5  # Reduced from 10
-  if (plot_info$has_subtitle) top_margin <- top_margin + 3  # Reduced from 5
+  top_margin <- 10  # Reduced base top margin
+  if (plot_info$has_title) top_margin <- top_margin + 2  # Minimal addition for title
+  if (plot_info$has_subtitle) top_margin <- top_margin + 2  # Minimal addition for subtitle
   
   # Adjust for facets
   if (plot_info$facets) {
@@ -502,8 +504,8 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
   strip_bg <- image_blank(canvas_width, strip_height_px, color = strip_color)
   
   # Calculate positioning - much simpler with pixel coordinates!
-  icon_margin <- 40        # 40px from left edge
-  logo_margin <- 40        # 40px from right edge
+  icon_margin <- 15        # 15px from left edge (moved closer to edge)
+  logo_margin <- 15        # 15px from right edge (moved closer to edge)
   icon_size <- 36          # Icon height in pixels (smaller for better proportions)
   logo_height <- 26        # Logo height in pixels (smaller for better proportions)
   
@@ -642,15 +644,35 @@ create_dof_example_chart <- function(save_path = NULL) {
   # Calculate average for reference line
   avg_revenue <- mean(gaming_data$revenue_billions)
   
+  # Calculate dynamic position for average text with scalable logic
+  # For horizontal bar charts (coord_flip), positioning needs special handling
+  max_revenue <- max(gaming_data$revenue_billions)
+  min_revenue <- min(gaming_data$revenue_billions)
+  
+  # Position text horizontally: slightly to the right of the average line
+  text_y_position <- avg_revenue + (max_revenue * 0.025)  # 2.5% offset (half of previous)
+  
+  # Position text vertically: find a gap in the data to avoid overlap
+  # Sort platforms by revenue to find the best gap
+  sorted_revenues <- sort(gaming_data$revenue_billions, decreasing = TRUE)
+  
+  # Find which platforms are closest to the average
+  platform_positions <- seq_along(gaming_data$platform)
+  revenues_ordered <- gaming_data$revenue_billions[order(gaming_data$revenue_billions, decreasing = TRUE)]
+  
+  # Place text at a position that avoids overlap with bars
+  # Using 0.7 positions the text above the highest bar (30% up from top)
+  text_x_position <- 0.7
+  
   # Create the plot with new border and logo strip
   p <- ggplot(gaming_data, aes(x = reorder(platform, revenue_billions), y = revenue_billions)) +
     geom_col(aes(fill = category), width = 0.7) +
     geom_hline(yintercept = avg_revenue, linetype = "solid", 
                color = dof_colors$secondary, linewidth = 1.2, alpha = 0.9) +
-    annotate("text", y = avg_revenue, x = 0.5,
+    annotate("text", y = text_y_position, x = text_x_position,
              label = paste0("Avg: $", round(avg_revenue, 1), "B"),
              color = dof_colors$secondary, size = 3.5, family = dof_font_body,
-             hjust = 0.5, vjust = -0.5, fontface = "bold") +
+             hjust = 0, vjust = 0.5, fontface = "bold") +
     scale_fill_dof("purple_pink") +
     scale_y_continuous(labels = format_dof_billions, expand = c(0, 0, 0.1, 0)) +
     coord_flip() +
@@ -784,12 +806,31 @@ create_dof_stacked_chart <- function(save_path = NULL) {
     )
   )
   
+  # Calculate totals for each platform
+  platform_totals <- aggregate(revenue_millions ~ platform, stacked_data, sum)
+  
   # Create the stacked bar plot
   p <- ggplot(stacked_data, aes(x = platform, y = revenue_millions, fill = genre)) +
     geom_col(width = 0.7, alpha = 0.9) +
+    # Add labels inside each segment
+    geom_text(aes(label = paste0("$", round(revenue_millions/1000, 1), "B")), 
+              position = position_stack(vjust = 0.5),
+              color = "white",
+              size = 3.5,
+              fontface = "bold",
+              family = dof_font_body) +
+    # Add total labels on top of each bar
+    geom_text(data = platform_totals, 
+              aes(x = platform, y = revenue_millions, label = paste0("$", round(revenue_millions/1000, 1), "B")),
+              inherit.aes = FALSE,
+              vjust = -0.5,
+              color = dof_colors$secondary,
+              size = 4,
+              fontface = "bold",
+              family = dof_font_body) +
     scale_fill_dof("full") +
     scale_y_continuous(labels = function(x) paste0("$", round(x/1000, 1), "B"), 
-                       expand = c(0, 0, 0.05, 0)) +
+                       expand = c(0, 0, 0.1, 0)) +
     labs(
       title = "GAMING REVENUE BY PLATFORM AND GENRE IN 2024",
       subtitle = "Mobile gaming dominates across all genres, with RPG and Action\\ngames generating the highest revenue per platform",
@@ -806,7 +847,10 @@ create_dof_stacked_chart <- function(save_path = NULL) {
         hjust = 1,
         family = dof_font_subtitle,
         margin = margin(t = 15)
-      )
+      ),
+      # Remove y-axis text since we have labels
+      axis.text.y = element_blank(),
+      panel.grid.major.y = element_blank()
     )
   
   # Create the image-based container with logo strip
