@@ -223,50 +223,33 @@ create_dof_example_table <- function() {
     # Add source note 
     tab_source_note(
       source_note = "Deconstructor of Fun • Gaming Industry Analysis 2024"
-    ) %>%
+    )
     
-    # Add custom CSS to ensure fonts are properly applied and container borders
-    {
-      # Build CSS outside pipe context
-      base_css <- "
-        .gt_title {
-          font-family: 'Agrandir', 'Arial Black', 'Helvetica Neue', sans-serif !important;
-        }
-        .gt_subtitle {
-          font-family: 'Inter Tight', 'Inter', 'Helvetica Neue', sans-serif !important;
-        }
-        .gt_col_heading, .gt_column_spanner, .gt_sourcenote, .gt_row {
-          font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
-        }
-        table, .gt_table {
-          font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
-        }
-        /* Fallback for all text elements */
-        * {
-          font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
-        }
-        /* Ensure font loading fallbacks work */
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap');
-      "
-      
-      # Add border CSS if requested
-      if (container_border) {
-        border_css <- paste0("
-          /* DoF Container Border */
-          .gt_table {
-            border: ", container_border_width, "px solid ", container_border_color, " !important;
-            border-radius: 0 !important;
-          }
-        ")
-        final_css <- paste0(base_css, border_css)
-      } else {
-        final_css <- base_css
-      }
-      
-      # Apply CSS using the built string
-      opt_css(css = final_css)
-    } %>%
+  # Add custom CSS to ensure fonts are properly applied
+  base_css <- "
+    .gt_title {
+      font-family: 'Agrandir', 'Arial Black', 'Helvetica Neue', sans-serif !important;
+    }
+    .gt_subtitle {
+      font-family: 'Inter Tight', 'Inter', 'Helvetica Neue', sans-serif !important;
+    }
+    .gt_col_heading, .gt_column_spanner, .gt_sourcenote, .gt_row {
+      font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
+    }
+    table, .gt_table {
+      font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
+    }
+    /* Fallback for all text elements */
+    * {
+      font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
+    }
+    /* Ensure font loading fallbacks work */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap');
+  "
+  
+  gt_table <- gt_table %>%
+    opt_css(css = base_css) %>%
     
     # Column groups
     tab_spanner(
@@ -274,8 +257,8 @@ create_dof_example_table <- function() {
       columns = c(`Revenue (Billions)`, `Growth Rate (%)`, `Market Share (%)`)
     )
   
-  # Return the result
-  return(result_table)
+  # Return the gt table
+  return(gt_table)
 }
 
 # Print usage information

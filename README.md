@@ -2,7 +2,7 @@
 
 Professional R visualization themes for the Deconstructor of Fun podcast, featuring custom colors, typography, and branded chart containers.
 
-![DoF Theme Example](examples/output/example_chart.png)
+![DoF Theme Example](examples/output/example_bar_chart.png)
 
 ## Features
 
@@ -183,7 +183,7 @@ Rscript run_all_examples.R
 ```
 
 This generates:
-- `example_chart.png` - Basic bar chart
+- `example_bar_chart.png` - Basic bar chart
 - `example_line_chart.png` - Line chart with smoothing
 - `example_stacked_bar_chart.png` - Stacked bars
 - `example_100_stacked_bar_chart.png` - 100% stacked with labels

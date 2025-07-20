@@ -254,8 +254,8 @@ calculate_adaptive_margins <- function(plot, width, height, logo_strip, strip_he
   
   # Calculate adaptive margins
   top_margin <- base_margin
-  if (plot_info$has_title) top_margin <- top_margin + 10
-  if (plot_info$has_subtitle) top_margin <- top_margin + 5
+  if (plot_info$has_title) top_margin <- top_margin + 5  # Reduced from 10
+  if (plot_info$has_subtitle) top_margin <- top_margin + 3  # Reduced from 5
   
   # Adjust for facets
   if (plot_info$facets) {
@@ -504,8 +504,8 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
   # Calculate positioning - much simpler with pixel coordinates!
   icon_margin <- 40        # 40px from left edge
   logo_margin <- 40        # 40px from right edge
-  icon_size <- 40          # Icon height in pixels (smaller for better proportions)
-  logo_height <- 28        # Logo height in pixels (smaller for better proportions)
+  icon_size <- 36          # Icon height in pixels (smaller for better proportions)
+  logo_height <- 26        # Logo height in pixels (smaller for better proportions)
   
   # Add icon on the left if available
   if (file.exists(icon_path)) {
@@ -523,6 +523,9 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
     
     # Calculate vertical center position using actual image height
     icon_y <- round((strip_height_px - actual_icon_height) / 2)
+    
+    # Add 3px downward adjustment to better center visually
+    icon_y <- icon_y + 3
     
     # Ensure minimum offset to prevent clipping
     icon_y <- max(icon_y, 1)
@@ -550,6 +553,9 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
     # Calculate positions (right-aligned and vertically centered using actual dimensions)
     logo_x <- canvas_width - actual_logo_width - logo_margin
     logo_y <- round((strip_height_px - actual_logo_height) / 2)
+    
+    # Add 3px downward adjustment to better center visually
+    logo_y <- logo_y + 3
     
     # Ensure minimum offset to prevent clipping
     logo_y <- max(logo_y, 1)
@@ -633,9 +639,18 @@ create_dof_example_chart <- function(save_path = NULL) {
     category = c("Traditional", "Traditional", "Traditional", "Emerging", "Emerging")
   )
   
+  # Calculate average for reference line
+  avg_revenue <- mean(gaming_data$revenue_billions)
+  
   # Create the plot with new border and logo strip
   p <- ggplot(gaming_data, aes(x = reorder(platform, revenue_billions), y = revenue_billions)) +
     geom_col(aes(fill = category), width = 0.7) +
+    geom_hline(yintercept = avg_revenue, linetype = "solid", 
+               color = dof_colors$secondary, linewidth = 1.2, alpha = 0.9) +
+    annotate("text", y = avg_revenue, x = 0.5,
+             label = paste0("Avg: $", round(avg_revenue, 1), "B"),
+             color = dof_colors$secondary, size = 3.5, family = dof_font_body,
+             hjust = 0.5, vjust = -0.5, fontface = "bold") +
     scale_fill_dof("purple_pink") +
     scale_y_continuous(labels = format_dof_billions, expand = c(0, 0, 0.1, 0)) +
     coord_flip() +
@@ -709,13 +724,13 @@ create_dof_line_chart <- function(save_path = NULL) {
   # Create the line plot
   p <- ggplot(games_data, aes(x = date, y = daily_revenue, color = game)) +
     geom_smooth(method = "loess", se = FALSE, linewidth = 1.2, alpha = 0.8) +
-    geom_point(size = 2, alpha = 0.7) +
+    geom_point(size = 2, alpha = 0.5) +  # Increased transparency
     geom_hline(yintercept = overall_avg, linetype = "solid", 
-               color = dof_colors$grey_light, linewidth = 0.5, alpha = 0.8) +
+               color = dof_colors$secondary, linewidth = 1.2, alpha = 0.9) +  # Made line more prominent
     annotate("text", x = max(games_data$date), y = overall_avg,
              label = paste0("Avg: ", format_dof_smart_currency(overall_avg)),
-             color = dof_colors$grey_dark, size = 3, family = dof_font_body,
-             hjust = 1.1, vjust = -0.5, fontface = "plain") +
+             color = dof_colors$secondary, size = 3.5, family = dof_font_body,
+             hjust = 1.1, vjust = -0.5, fontface = "bold") +  # Made text bold and larger
     scale_color_dof("full") +
     scale_y_continuous(labels = format_dof_smart_currency, expand = c(0, 0, 0.05, 0)) +
     scale_x_date(date_labels = "%b %d", date_breaks = "1 week") +
