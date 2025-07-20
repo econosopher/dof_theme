@@ -682,7 +682,7 @@ create_dof_example_chart <- function(save_path = NULL) {
       x = NULL,  # Remove axis labels for 538-style
       y = NULL,  # Remove axis labels for 538-style  
       fill = "Platform Type",
-      caption = "Deconstructor of Fun • Gaming Industry Analysis"
+      caption = "Deconstructor of Fun • Sensor Tower Data"
     ) +
     theme_dof(base_size = 12) +
     theme(
@@ -762,7 +762,7 @@ create_dof_line_chart <- function(save_path = NULL) {
       x = NULL,
       y = NULL,
       color = "Game Title",
-      caption = "Deconstructor of Fun • Mobile Gaming Revenue Analysis"
+      caption = "Deconstructor of Fun • Sensor Tower Data"
     ) +
     theme_dof(base_size = 12) +
     theme(
@@ -837,7 +837,7 @@ create_dof_stacked_chart <- function(save_path = NULL) {
       x = NULL,
       y = NULL,
       fill = "Game Genre",
-      caption = "Deconstructor of Fun • Gaming Industry Analysis"
+      caption = "Deconstructor of Fun • Sensor Tower Data"
     ) +
     theme_dof(base_size = 12) +
     theme(
@@ -900,7 +900,7 @@ create_dof_100_stacked_chart <- function(save_path = NULL) {
       x = NULL,
       y = NULL,
       fill = "Monetization Model",
-      caption = "Deconstructor of Fun • Gaming Business Model Analysis"
+      caption = "Deconstructor of Fun • Sensor Tower Data"
     ) +
     theme_dof(base_size = 12) +
     theme(

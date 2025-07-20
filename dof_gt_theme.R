@@ -202,7 +202,7 @@ create_dof_example_table <- function() {
       style = list(
         cell_text(
           font = dof_font_title,      # Agrandir font stack
-          weight = "bold",
+          weight = "normal",
           size = px(18),              # Proportional to table size
           color = dof_colors$secondary,
           align = "left"
@@ -260,7 +260,7 @@ create_dof_example_table <- function() {
     
     # Add source note without image for better PNG compatibility
     tab_source_note(
-      source_note = "Deconstructor of Fun • Gaming Industry Analysis 2024"
+      source_note = "Deconstructor of Fun • Sensor Tower Data"
     )
     
   # Add custom CSS to ensure fonts are properly applied
@@ -291,6 +291,7 @@ create_dof_example_table <- function() {
     .gt_sourcenote {
       color: #0F0D4F !important;
       font-weight: 500 !important;
+      text-align: right !important;
     }
     /* Ensure font loading fallbacks work */
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
