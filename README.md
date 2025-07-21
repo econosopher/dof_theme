@@ -14,6 +14,15 @@ Professional R visualization themes for the Deconstructor of Fun podcast, featur
 
 ## Installation
 
+### Option 1: One-Line Installation (Recommended)
+
+```r
+# Install and load the DoF theme directly from GitHub
+source("https://raw.githubusercontent.com/econosopher/dof_theme/main/load_dof_theme.R")
+```
+
+### Option 2: Clone Repository
+
 ```r
 # Clone this repository
 git clone https://github.com/econosopher/dof_theme.git
@@ -24,6 +33,16 @@ install.packages(c("ggplot2", "gt", "magick", "scales", "dplyr"))
 # Source the theme files
 source("dof_theme.R")
 source("dof_gt_theme.R")
+```
+
+### Option 3: Direct Sourcing
+
+```r
+# Source just the ggplot2 theme
+source("https://raw.githubusercontent.com/econosopher/dof_theme/main/dof_theme.R")
+
+# Source just the GT theme (requires gt package)
+source("https://raw.githubusercontent.com/econosopher/dof_theme/main/dof_gt_theme.R")
 ```
 
 ## Quick Start
@@ -91,8 +110,8 @@ scale_fill_dof("purple_pink")  # Purple to pink gradient
 scale_fill_dof("full")         # All brand colors
 
 # Access individual colors
-dof_colors$primary    # #FF66A5 (Galactic Magenta)
-dof_colors$secondary  # #0F0D4F (Midnight Indigo)
+dof_colors$primary    # #DE72FA (Galactic Magenta)
+dof_colors$secondary  # #0F004F (Midnight Indigo)
 dof_colors$accent     # #4F00EB (Pac(Man) Purple)
 ```
 
@@ -157,8 +176,8 @@ ggplot(data, aes(x = date, y = revenue)) +
 ## Brand Guidelines
 
 ### Colors
-- **Primary**: #FF66A5 (Galactic Magenta) - Used for emphasis and borders
-- **Secondary**: #0F0D4F (Midnight Indigo) - Text and dark elements
+- **Primary**: #DE72FA (Galactic Magenta) - Used for emphasis and borders
+- **Secondary**: #0F004F (Midnight Indigo) - Text and dark elements
 - **Accent**: #4F00EB (Pac(Man) Purple) - Highlights and accents
 
 ### Typography
