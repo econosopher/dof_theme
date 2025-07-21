@@ -10,13 +10,13 @@ if (file.exists("dof_theme.R")) {
 } else {
   # Define colors if main theme not available
   dof_colors <- list(
-    primary = "#FF66A5",      # Galactic Magenta
-    secondary = "#0F0D4F",    # Midnight Indigo
+    primary = "#DE72FA",      # Galactic Magenta
+    secondary = "#0F004F",    # Midnight Indigo (updated)
     accent = "#4F00EB",       # Pac(Man) Purple
     white = "#FFFFFF",
     black = "#000000",
-    light_pink = "#FFB3D1",
-    dark_purple = "#0A0835",
+    light_pink = "#EDB9FC",
+    dark_purple = "#080033",  # Darker version of Midnight Indigo (updated)
     grey_light = "#F5F5F5",
     grey_dark = "#424242"
   )
@@ -289,7 +289,7 @@ create_dof_example_table <- function() {
     }
     /* Source note styling to match charts */
     .gt_sourcenote {
-      color: #0F0D4F !important;
+      color: #0F004F !important;
       font-weight: 500 !important;
       text-align: right !important;
     }

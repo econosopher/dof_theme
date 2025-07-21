@@ -64,13 +64,13 @@ dof_font_family <- dof_font_title
 
 # Define DoF color palette (official brand colors)
 dof_colors <- list(
-  primary = "#FF66A5",      # Galactic Magenta
-  secondary = "#0F0D4F",    # Midnight Indigo
+  primary = "#DE72FA",      # Galactic Magenta
+  secondary = "#0F004F",    # Midnight Indigo (updated)
   accent = "#4F00EB",       # Pac(Man) Purple
   white = "#FFFFFF",        # White
   black = "#000000",        # Black
-  light_pink = "#FFB3D1",   # Lighter version of Galactic Magenta
-  dark_purple = "#0A0835",  # Darker version of Midnight Indigo
+  light_pink = "#EDB9FC",   # Lighter version of Galactic Magenta
+  dark_purple = "#080033",  # Darker version of Midnight Indigo (updated)
   grey_light = "#F5F5F5",
   grey_dark = "#424242"
 )
