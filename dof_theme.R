@@ -2,62 +2,90 @@
 # Custom theme and color palette for DoF podcast
 
 library(ggplot2)
-library(png)
 library(grid)
 library(scales)
-library(gridExtra)
 
-# Load magick for image-based post-processing
-if (!require(magick, quietly = TRUE)) {
-  cat("Installing magick package for image processing...\n")
-  install.packages("magick")
-  library(magick)
-} else {
-  library(magick)
-}
-
-# Prevent automatic Rplot.pdf generation
-options(device = function(...) png(tempfile(), ...))
-
-# Font setup - DoF font hierarchy
-# Primary: Agrandir (titles)
-# Secondary: Inter Tight (subtitles, secondary text)  
-# Tertiary: Poppins (axis labels, UI elements)
-# Fonts are included in style_guide/fonts/ folder
-
-# Install fonts to system if needed
-install_dof_fonts <- function() {
-  font_paths <- list(
-    agrandir = "style_guide/fonts/Agrandir.ttf",
-    inter_tight = "style_guide/fonts/Inter_Tight/InterTight-VariableFont_wght.ttf",
-    poppins_regular = "style_guide/fonts/Poppins/Poppins-Regular.ttf",
-    poppins_bold = "style_guide/fonts/Poppins/Poppins-Bold.ttf"
-  )
-  
-  for (font_name in names(font_paths)) {
-    font_path <- font_paths[[font_name]]
-    if (file.exists(font_path)) {
-      system(paste("cp", shQuote(font_path), "~/Library/Fonts/"))
+# Strict package requirements (fail fast)
+dof_require_packages <- function(pkgs) {
+  for (pkg in pkgs) {
+    if (!requireNamespace(pkg, quietly = TRUE)) {
+      stop(paste0("Required package '", pkg, "' is not installed. Install with: install.packages(\"", pkg, "\")"), call. = FALSE)
     }
   }
-  
-  message("DoF fonts installed to ~/Library/Fonts/")
-  message("Run library(extrafont); font_import(); loadfonts() to use in R")
 }
 
-# Font hierarchy with fallbacks
-dof_font_title <- "sans"      # Agrandir for titles
-dof_font_subtitle <- "sans"   # Inter Tight for subtitles
-dof_font_body <- "sans"       # Poppins for axis labels/UI
+dof_require_packages(c("magick", "showtext", "sysfonts"))
 
-# Temporarily disabled custom fonts to avoid crashes
-# TODO: Re-enable once font compatibility issues are resolved
-# tryCatch({
-#   if (require(extrafont, quietly = TRUE)) {
-#     available_fonts <- fonts()
-#     # ... font detection code ...
-#   }
-# }, error = function(e) invisible())
+# Font setup - DoF font hierarchy (fail if fonts are missing)
+# Primary: Agrandir (titles)
+# Secondary: Inter Tight (subtitles, secondary text)
+# Tertiary: Poppins (axis labels, UI elements)
+# Fonts are included in style_guide/fonts/ folder.
+
+dof_find_existing <- function(candidates) {
+  for (p in candidates) {
+    if (file.exists(p)) return(normalizePath(p, winslash = "/", mustWork = TRUE))
+  }
+  NA_character_
+}
+
+.dof_font_files <- list(
+  agrandir_regular = dof_find_existing(c(
+    "style_guide/fonts/Agrandir.ttf",
+    "../style_guide/fonts/Agrandir.ttf"
+  )),
+  inter_tight_regular = dof_find_existing(c(
+    "style_guide/fonts/Inter_Tight/static/InterTight-Regular.ttf",
+    "../style_guide/fonts/Inter_Tight/static/InterTight-Regular.ttf",
+    "style_guide/fonts/Inter_Tight/InterTight-VariableFont_wght.ttf",
+    "../style_guide/fonts/Inter_Tight/InterTight-VariableFont_wght.ttf"
+  )),
+  inter_tight_bold = dof_find_existing(c(
+    "style_guide/fonts/Inter_Tight/static/InterTight-Bold.ttf",
+    "../style_guide/fonts/Inter_Tight/static/InterTight-Bold.ttf"
+  )),
+  poppins_regular = dof_find_existing(c(
+    "style_guide/fonts/Poppins/Poppins-Regular.ttf",
+    "../style_guide/fonts/Poppins/Poppins-Regular.ttf"
+  )),
+  poppins_bold = dof_find_existing(c(
+    "style_guide/fonts/Poppins/Poppins-Bold.ttf",
+    "../style_guide/fonts/Poppins/Poppins-Bold.ttf"
+  ))
+)
+
+dof_verify_font_files <- function() {
+  paths <- unlist(.dof_font_files, use.names = TRUE)
+  missing_idx <- is.na(paths) | !file.exists(paths)
+  if (any(missing_idx)) {
+    missing <- names(paths)[missing_idx]
+    stop(paste0(
+      "Missing required font files: ",
+      paste(missing, collapse = ", "),
+      ". Ensure fonts are present under 'style_guide/fonts/'."
+    ), call. = FALSE)
+  }
+}
+
+dof_register_fonts <- function() {
+  dof_verify_font_files()
+  # Register fonts with sysfonts/showtext; these names are used in themes
+  sysfonts::font_add(family = "Agrandir", regular = .dof_font_files$agrandir_regular)
+  sysfonts::font_add(family = "Inter Tight", regular = .dof_font_files$inter_tight_regular, bold = .dof_font_files$inter_tight_bold)
+  sysfonts::font_add(family = "Poppins", regular = .dof_font_files$poppins_regular, bold = .dof_font_files$poppins_bold)
+  showtext::showtext_auto(enable = TRUE)
+}
+
+# Export font paths for consumers (e.g., GT CSS embedding)
+dof_get_font_paths <- function() .dof_font_files
+
+# Register immediately; fail fast on load
+dof_register_fonts()
+
+# Font family names (no fallbacks)
+dof_font_title <- "Agrandir"
+dof_font_subtitle <- "Inter Tight"
+dof_font_body <- "Poppins"
 
 # Backward compatibility
 dof_font_family <- dof_font_title
@@ -75,6 +103,20 @@ dof_colors <- list(
   grey_dark = "#424242"
 )
 
+# Resolve named or raw color values
+resolve_dof_color <- function(value, default = dof_colors$primary) {
+  if (is.null(value)) return(default)
+  # Accept named keys
+  if (is.character(value) && length(value) == 1) {
+    key <- tolower(value)
+    # Common synonyms
+    if (key == "purple") key <- "accent"
+    if (!is.null(dof_colors[[key]])) return(dof_colors[[key]])
+  }
+  # Otherwise assume hex or R-named color
+  value
+}
+
 # Create color palette function
 dof_palette <- function(type = "main", reverse = FALSE) {
   colors <- switch(type,
@@ -88,20 +130,17 @@ dof_palette <- function(type = "main", reverse = FALSE) {
   colors
 }
 
-# Helper function to automatically convert titles to uppercase (538-style)
+# Helper retained for backwards-compatibility (unused by default)
 format_title_538 <- function(title) {
   if (is.null(title) || title == "") return(title)
   toupper(title)
 }
 
 # Custom ggplot2 theme with 538-inspired bold, uppercase titles
-theme_dof <- function(base_size = 12, logo_alpha = 0.1, border = TRUE, border_color = NULL, 
-                      uppercase_titles = TRUE) {
+theme_dof <- function(base_size = 12, border = TRUE, border_color = NULL) {
   
-  # Set default border color to DoF primary pink
-  if (is.null(border_color)) {
-    border_color <- dof_colors$primary
-  }
+  # Set default border color
+  if (is.null(border_color)) border_color <- dof_colors$primary
   
   # Base theme with border
   base_theme <- theme_minimal(base_size = base_size) +
@@ -112,7 +151,7 @@ theme_dof <- function(base_size = 12, logo_alpha = 0.1, border = TRUE, border_co
         size = base_size * 2.2,  # Much larger for commanding presence (26px at base 12)
         color = dof_colors$secondary,
         face = "bold",
-        family = dof_font_title,  # Agrandir Variable
+        family = dof_font_title,
         hjust = 0,  # Left-aligned like 538
         margin = margin(l = 0, b = 5, t = 0)  # Reduced margins for tighter spacing
       ),
@@ -120,18 +159,18 @@ theme_dof <- function(base_size = 12, logo_alpha = 0.1, border = TRUE, border_co
       plot.subtitle = element_text(
         size = base_size * 1.1,
         color = dof_colors$grey_dark,
-        family = dof_font_subtitle,  # Inter Tight
+        family = dof_font_subtitle,
         hjust = 0,  # Left-aligned like title
         margin = margin(l = 0, b = 15)  # Increased bottom margin for more space
       ),
       plot.subtitle.position = "plot",  # Align with entire plot area
       
-      # Axis styling with Poppins (538-inspired: minimal approach)
+       # Axis styling with Poppins (538-inspired: minimal approach)
       axis.title = element_blank(),  # Remove axis titles like 538
       axis.text = element_text(
         color = dof_colors$grey_dark,
         size = base_size * 0.8,
-        family = dof_font_body  # Poppins
+        family = dof_font_body
       ),
       axis.line = element_blank(),  # Remove axis lines like 538
       axis.ticks = element_blank(),  # Remove axis ticks like 538
@@ -144,7 +183,7 @@ theme_dof <- function(base_size = 12, logo_alpha = 0.1, border = TRUE, border_co
       ),
       panel.grid.minor = element_blank(),
       
-      # Background with DoF pink border
+       # Background with DoF pink border
       plot.background = element_rect(
         fill = "white", 
         color = if (border) border_color else NA,
@@ -157,12 +196,12 @@ theme_dof <- function(base_size = 12, logo_alpha = 0.1, border = TRUE, border_co
         color = dof_colors$secondary,
         size = base_size * 0.9,
         face = "bold",
-        family = dof_font_body  # Poppins
+        family = dof_font_body
       ),
       legend.text = element_text(
         color = dof_colors$grey_dark,
         size = base_size * 0.8,
-        family = dof_font_body  # Poppins
+        family = dof_font_body
       ),
       legend.position = "bottom",
       legend.direction = "horizontal",  # 538-style horizontal legend
@@ -174,7 +213,7 @@ theme_dof <- function(base_size = 12, logo_alpha = 0.1, border = TRUE, border_co
         color = dof_colors$white,
         face = "bold",
         size = base_size * 0.9,
-        family = dof_font_body  # Poppins
+        family = dof_font_body
       ),
       strip.background = element_rect(
         fill = dof_colors$primary,
@@ -291,7 +330,7 @@ create_dof_container <- function(plot,
                                  border_width = 9,
                                  width = NULL,              # Auto-detect if NULL
                                  height = NULL,             # Auto-detect if NULL
-                                 dpi = 150) {               # Higher DPI for better quality
+                                  dpi = 150) {               # Higher DPI for better quality
   
   # Validate inputs
   if (!is_ggplot(plot)) {
@@ -319,13 +358,9 @@ create_dof_container <- function(plot,
     height <- max(height, 400)
   }
   
-  # Set default colors
-  if (is.null(strip_color)) {
-    strip_color <- dof_colors$primary
-  }
-  if (is.null(border_color)) {
-    border_color <- dof_colors$primary
-  }
+  # Set colors (accept named keys like "accent" or hex strings)
+  strip_color <- resolve_dof_color(strip_color, default = dof_colors$primary)
+  border_color <- resolve_dof_color(border_color, default = dof_colors$primary)
   
   # Adaptive margin system based on plot complexity
   plot_margins <- calculate_adaptive_margins(plot, width, height, logo_strip, strip_height_px)
@@ -349,7 +384,7 @@ create_dof_container <- function(plot,
     
     ggsave(temp_plot_file, clean_plot, 
            width = width/100, height = chart_height/100, 
-           units = "in", dpi = 100, bg = "white")
+           units = "in", dpi = dpi, bg = "white")
     
     # Validate file was created
     if (!file.exists(temp_plot_file)) {
@@ -440,6 +475,12 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
         "logo*"
       )
       search_dirs <- c(
+        # New preferred structure
+        "assets/brand/wordmark/horizontal",
+        "../assets/brand/wordmark/horizontal",
+        "assets/brand/wordmark",
+        "../assets/brand/wordmark",
+        # Backward compatibility with previous layouts
         "images/Wordmark/03_Horizontal Layout",
         "../images/Wordmark/03_Horizontal Layout", 
         "Images/Wordmark/03_Horizontal Layout",
@@ -464,6 +505,10 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
         "icon*"
       )
       search_dirs <- c(
+        # New preferred structure
+        "assets/brand/icon",
+        "../assets/brand/icon",
+        # Backward compatibility with previous layouts
         "images/Icon",
         "../images/Icon",
         "Images/Icon",
@@ -500,8 +545,8 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
     icon_path <- find_asset_path("icon", icon_color)
   }
   
-  # Create pink background strip
-  strip_bg <- image_blank(canvas_width, strip_height_px, color = strip_color)
+  # Create background strip
+  strip_bg <- magick::image_blank(canvas_width, strip_height_px, color = strip_color)
   
   # Calculate positioning - much simpler with pixel coordinates!
   icon_margin <- 15        # 15px from left edge (moved closer to edge)
@@ -511,16 +556,16 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
   
   # Add icon on the left if available
   if (file.exists(icon_path)) {
-    icon_img <- image_read(icon_path)
+    icon_img <- magick::image_read(icon_path)
     
     # Resize icon to desired height while maintaining aspect ratio
-    icon_info <- image_info(icon_img)
+    icon_info <- magick::image_info(icon_img)
     icon_aspect <- icon_info$width / icon_info$height
     icon_width <- round(icon_size * icon_aspect)
-    icon_img <- image_resize(icon_img, paste0(icon_width, "x", icon_size, "!"))
+    icon_img <- magick::image_resize(icon_img, paste0(icon_width, "x", icon_size, "!"))
     
     # Get actual dimensions after resize for precise centering
-    resized_icon_info <- image_info(icon_img)
+    resized_icon_info <- magick::image_info(icon_img)
     actual_icon_height <- resized_icon_info$height
     
     # Calculate vertical center position using actual image height
@@ -533,22 +578,22 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
     icon_y <- max(icon_y, 1)
     
     # Composite icon onto strip
-    strip_bg <- image_composite(strip_bg, icon_img, 
+    strip_bg <- magick::image_composite(strip_bg, icon_img, 
                                offset = paste0("+", icon_margin, "+", icon_y))
   }
   
   # Add logo on the right if available
   if (file.exists(logo_path)) {
-    logo_img <- image_read(logo_path)
+    logo_img <- magick::image_read(logo_path)
     
     # Resize logo to desired height while maintaining aspect ratio
-    logo_info <- image_info(logo_img)
+    logo_info <- magick::image_info(logo_img)
     logo_aspect <- logo_info$width / logo_info$height
     logo_width <- round(logo_height * logo_aspect)
-    logo_img <- image_resize(logo_img, paste0(logo_width, "x", logo_height, "!"))
+    logo_img <- magick::image_resize(logo_img, paste0(logo_width, "x", logo_height, "!"))
     
     # Get actual dimensions after resize for precise centering
-    resized_logo_info <- image_info(logo_img)
+    resized_logo_info <- magick::image_info(logo_img)
     actual_logo_height <- resized_logo_info$height
     actual_logo_width <- resized_logo_info$width
     
@@ -564,21 +609,21 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
     logo_x <- max(logo_x, 0)
     
     # Composite logo onto strip
-    strip_bg <- image_composite(strip_bg, logo_img, 
+    strip_bg <- magick::image_composite(strip_bg, logo_img, 
                                offset = paste0("+", logo_x, "+", logo_y))
   } else {
     warning("Logo file not found.")
   }
   
   # Get canvas dimensions
-  canvas_info <- image_info(canvas)
+  canvas_info <- magick::image_info(canvas)
   canvas_height <- canvas_info$height
   
   # Calculate position for logo strip (bottom of canvas)
   strip_y <- canvas_height - strip_height_px
   
   # Composite the logo strip onto the bottom of the canvas
-  result <- image_composite(canvas, strip_bg, 
+  result <- magick::image_composite(canvas, strip_bg, 
                            offset = paste0("+0+", strip_y))
   
   return(result)

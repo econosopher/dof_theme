@@ -1,31 +1,24 @@
-# Deconstructor of Fun Theme Examples
-# Run all examples and generate outputs
+# DoF consolidated examples (charts + table)
 
-# Create output directory if it doesn't exist
-if (!dir.exists("output")) {
-  dir.create("output", recursive = TRUE)
+message("Running DoF examples...")
+
+if (!dir.exists("output")) dir.create("output", recursive = TRUE)
+file.remove(list.files("output", full.names = TRUE))
+
+source("../dof_theme.R")
+
+# Charts
+example_bar_chart <- create_dof_example_chart("output/example_bar_chart.png")
+example_line_chart <- create_dof_line_chart("output/example_line_chart.png")
+example_stacked_chart <- create_dof_stacked_chart("output/example_stacked_bar_chart.png")
+example_100_stacked_chart <- create_dof_100_stacked_chart("output/example_100_stacked_bar_chart.png")
+
+# Table
+if (!requireNamespace("gt", quietly = TRUE)) {
+  stop("Package 'gt' is required for table example. install.packages('gt')")
 }
+source("../dof_gt_theme.R")
+example_table <- create_dof_example_table()
+gt::gtsave(data = example_table, filename = "output/example_table.png")
 
-# Clean up old output files before generating new ones
-old_files <- list.files("output", full.names = TRUE)
-if (length(old_files) > 0) {
-  file.remove(old_files)
-}
-
-# Run all ggplot2 chart examples
-tryCatch({
-  source("example_charts.R")
-  # All charts completed
-}, error = function(e) {
-  stop("Chart examples failed: ", e$message)
-})
-
-# 2. Run GT table example
-tryCatch({
-  source("example_table.R")
-  # Table example completed
-}, error = function(e) {
-  stop("Table example failed: ", e$message)
-})
-
-# Examples completed
+message("Generated ", length(list.files("output", pattern = "\\.png$")), " examples in output/")

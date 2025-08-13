@@ -14,11 +14,12 @@ Professional R visualization themes for the Deconstructor of Fun podcast, featur
 
 ## Installation
 
-### Option 1: One-Line Installation (Recommended)
+### Option 1: One-Line Installation (with web fonts fallback)
 
 ```r
-# Install and load the DoF theme directly from GitHub
-source("https://raw.githubusercontent.com/econosopher/dof_theme/main/load_dof_theme.R")
+# Source the ggplot and GT theme files
+source("https://raw.githubusercontent.com/econosopher/dof_theme/main/dof_theme.R")
+source("https://raw.githubusercontent.com/econosopher/dof_theme/main/dof_gt_theme.R")
 ```
 
 ### Option 2: Clone Repository
@@ -28,7 +29,7 @@ source("https://raw.githubusercontent.com/econosopher/dof_theme/main/load_dof_th
 git clone https://github.com/econosopher/dof_theme.git
 
 # Install required packages
-install.packages(c("ggplot2", "gt", "magick", "scales", "dplyr"))
+install.packages(c("ggplot2", "gt", "magick", "scales", "dplyr", "showtext", "sysfonts", "base64enc"))
 
 # Source the theme files
 source("dof_theme.R")
@@ -38,10 +39,8 @@ source("dof_gt_theme.R")
 ### Option 3: Direct Sourcing
 
 ```r
-# Source just the ggplot2 theme
+# Source ggplot2 and GT themes (requires local fonts and packages)
 source("https://raw.githubusercontent.com/econosopher/dof_theme/main/dof_theme.R")
-
-# Source just the GT theme (requires gt package)
 source("https://raw.githubusercontent.com/econosopher/dof_theme/main/dof_gt_theme.R")
 ```
 
@@ -50,7 +49,7 @@ source("https://raw.githubusercontent.com/econosopher/dof_theme/main/dof_gt_them
 ### Basic Chart with DoF Theme
 
 ```r
-# Create a simple bar chart
+# Create a simple bar chart (strip can be set to "accent" for purple)
 library(ggplot2)
 source("dof_theme.R")
 
@@ -67,8 +66,8 @@ p <- ggplot(data, aes(x = category, y = value)) +
   labs(title = "GAMING REVENUE BY PLATFORM") +
   theme_dof()
 
-# Add branded container with border and logo
-create_dof_container(p)
+# Add branded container with border and purple strip
+create_dof_container(p, strip_color = "accent")
 ```
 
 ### GT Table with DoF Theme

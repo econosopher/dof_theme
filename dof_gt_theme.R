@@ -4,46 +4,50 @@
 library(gt)
 library(dplyr)
 
-# Source the main DoF theme for colors
+# Require and source the main DoF theme (fail fast)
 if (file.exists("dof_theme.R")) {
   source("dof_theme.R")
+} else if (file.exists("../dof_theme.R")) {
+  source("../dof_theme.R")
 } else {
-  # Define colors if main theme not available
-  dof_colors <- list(
-    primary = "#DE72FA",      # Galactic Magenta
-    secondary = "#0F004F",    # Midnight Indigo (updated)
-    accent = "#4F00EB",       # Pac(Man) Purple
-    white = "#FFFFFF",
-    black = "#000000",
-    light_pink = "#EDB9FC",
-    dark_purple = "#080033",  # Darker version of Midnight Indigo (updated)
-    grey_light = "#F5F5F5",
-    grey_dark = "#424242"
-  )
-  
-  # Font setup - DoF font hierarchy with CSS-compatible font stacks
-  dof_font_title <- "'Agrandir', 'Arial Black', 'Helvetica Neue', sans-serif"
-  dof_font_subtitle <- "'Inter Tight', 'Inter', 'Helvetica Neue', sans-serif" 
-  dof_font_body <- "'Poppins', 'Helvetica Neue', 'Arial', sans-serif"
-  
-  # Temporarily disabled custom fonts to avoid crashes
-  # TODO: Re-enable once font compatibility issues are resolved
-  
-  # Use body font as default for tables
-  dof_font_family <- dof_font_body
+  stop("dof_theme.R not found. Ensure it exists in the project root.", call. = FALSE)
+}
+
+use_web_fonts <- function() {
+  "@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Inter+Tight:wght@400;600;700&display=swap');\n"
+}
+
+# Embed Agrandir locally so GT exports get the correct title font
+embed_agrandir_css <- function() {
+  if (!requireNamespace("base64enc", quietly = TRUE)) {
+    stop("Required package 'base64enc' is not installed. Install with: install.packages('base64enc')", call. = FALSE)
+  }
+  paths <- dof_get_font_paths()
+  if (is.null(paths$agrandir_regular) || is.na(paths$agrandir_regular) || !file.exists(paths$agrandir_regular)) {
+    stop("Agrandir font file not found at style_guide/fonts/Agrandir.ttf", call. = FALSE)
+  }
+  raw <- readBin(paths$agrandir_regular, what = "raw", n = file.info(paths$agrandir_regular)$size)
+  b64 <- base64enc::base64encode(raw)
+  paste0("@font-face { font-family: 'Agrandir'; src: url('data:font/ttf;base64,", b64, "') format('truetype'); font-weight: normal; font-style: normal; }\n")
 }
 
 # Helper function to find DoF icon path
 find_dof_icon_path <- function() {
   search_dirs <- c(
-    "../images/Icon",
-    "../Images/Icon", 
-    "../images",
-    "../Images",
+    # New preferred structure
+    "assets/brand/icon",
+    "../assets/brand/icon",
+    # Backward compatibility
     "images/Icon",
+    "../images/Icon",
     "Images/Icon",
+    "../Images/Icon",
     "images",
-    "Images"
+    "../images",
+    "Images",
+    "../Images",
+    "assets/images",
+    "../assets/images"
   )
   
   for (dir in search_dirs) {
@@ -71,8 +75,8 @@ theme_dof_gt <- function(gt_table,
   result_table <- gt_table %>%
     # Table options
     tab_options(
-      # Font settings - use Poppins for table body
-      table.font.names = dof_font_body,  # Full font stack
+      # Font settings - use Poppins for table body (no fallback)
+      table.font.names = dof_font_body,
       table.font.size = px(12),
       
       # Reduce heading padding
@@ -121,7 +125,7 @@ theme_dof_gt <- function(gt_table,
         cell_text(
           color = header_text,
           weight = "bold",
-          font = dof_font_body  # Poppins font stack for headers
+          font = dof_font_body
         )
       ),
       locations = cells_column_labels(everything())
@@ -132,7 +136,7 @@ theme_dof_gt <- function(gt_table,
       style = list(
         cell_text(
           color = text_color,
-          font = dof_font_body  # Poppins font stack for data
+          font = dof_font_body
         )
       ),
       locations = cells_body()
@@ -201,7 +205,7 @@ create_dof_example_table <- function() {
     tab_style(
       style = list(
         cell_text(
-          font = dof_font_title,      # Agrandir font stack
+          font = dof_font_title,
           weight = "normal",
           size = px(18),              # Proportional to table size
           color = dof_colors$secondary,
@@ -216,7 +220,7 @@ create_dof_example_table <- function() {
     tab_style(
       style = list(
         cell_text(
-          font = dof_font_subtitle,    # Inter Tight font stack
+          font = dof_font_subtitle,
           size = px(13),               # Match chart subtitle size (base 12 * 1.1)
           color = dof_colors$grey_dark,
           align = "left"
@@ -263,15 +267,16 @@ create_dof_example_table <- function() {
       source_note = "Deconstructor of Fun • Sensor Tower Data"
     )
     
-  # Add custom CSS to ensure fonts are properly applied
-  base_css <- "
+  # CSS to use web fonts (Inter/Poppins) and embed Agrandir locally
+  base_css <- paste0(embed_agrandir_css(), use_web_fonts(),
+  "
     .gt_title {
-      font-family: 'Agrandir', 'Arial Black', 'Helvetica Neue', sans-serif !important;
+      font-family: 'Agrandir' !important;
       padding-bottom: 2px !important;
       margin-bottom: 0px !important;
     }
     .gt_subtitle {
-      font-family: 'Inter Tight', 'Inter', 'Helvetica Neue', sans-serif !important;
+      font-family: 'Inter Tight', 'Inter', sans-serif !important;
       padding-top: 0px !important;
       margin-top: 0px !important;
     }
@@ -287,16 +292,12 @@ create_dof_example_table <- function() {
     table, .gt_table {
       font-family: 'Poppins', 'Helvetica Neue', 'Arial', sans-serif !important;
     }
-    /* Source note styling to match charts */
     .gt_sourcenote {
       color: #0F004F !important;
       font-weight: 500 !important;
       text-align: right !important;
     }
-    /* Ensure font loading fallbacks work */
-    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
-    @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap');
-  "
+  ")
   
   gt_table <- gt_table %>%
     opt_css(css = base_css) %>%
@@ -312,12 +313,4 @@ create_dof_example_table <- function() {
 }
 
 # Print usage information
-cat("DoF GT Theme Loaded! 📊\n")
-cat("Font hierarchy:\n")
-cat("  • Titles:", dof_font_title, "\n")
-cat("  • Subtitles:", dof_font_subtitle, "\n")
-cat("  • Body/Data:", dof_font_body, "\n")
-cat("Usage:\n")
-cat("  your_gt_table %>% theme_dof_gt()\n")
-cat("  create_dof_example_table()\n")
-cat("Styling functions: style_dof_positive(), style_dof_negative(), style_dof_highlight()\n")
+invisible(TRUE)
