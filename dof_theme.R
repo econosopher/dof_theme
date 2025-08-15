@@ -22,8 +22,29 @@ dof_require_packages(c("magick", "showtext", "sysfonts"))
 # Tertiary: Poppins (axis labels, UI elements)
 # Fonts are included in style_guide/fonts/ folder.
 
+# Get the directory where this script is located
+# Use a more robust method to find the script directory
+.dof_theme_dir <- tryCatch({
+  # This works when sourced
+  dirname(normalizePath(sys.frame(1)$ofile))
+}, error = function(e) {
+  # Fallback: check if we're in an R package context
+  if (file.exists("../../dof_theme/style_guide/fonts/Agrandir.ttf")) {
+    normalizePath("../../dof_theme")
+  } else if (file.exists("style_guide/fonts/Agrandir.ttf")) {
+    getwd()
+  } else {
+    # Last resort: try to find the dof_theme directory
+    normalizePath(dirname(sys.frames()[[1]]$ofile))
+  }
+})
+
 dof_find_existing <- function(candidates) {
   for (p in candidates) {
+    # First try absolute path from theme directory
+    abs_path <- file.path(.dof_theme_dir, p)
+    if (file.exists(abs_path)) return(normalizePath(abs_path, winslash = "/", mustWork = TRUE))
+    # Then try relative path from current directory
     if (file.exists(p)) return(normalizePath(p, winslash = "/", mustWork = TRUE))
   }
   NA_character_
@@ -148,20 +169,22 @@ theme_dof <- function(base_size = 12, border = TRUE, border_color = NULL) {
       # Text styling with DoF font hierarchy
       text = element_text(color = dof_colors$secondary, family = dof_font_body),
       plot.title = element_text(
-        size = base_size * 2.2,  # Much larger for commanding presence (26px at base 12)
+        size = 24,  # Much larger for better readability
         color = dof_colors$secondary,
         face = "bold",
         family = dof_font_title,
         hjust = 0,  # Left-aligned like 538
-        margin = margin(l = 0, b = 5, t = 0)  # Reduced margins for tighter spacing
+        margin = margin(l = 0, b = 8, t = 0),  # Slightly more bottom margin
+        lineheight = 1.0
       ),
       plot.title.position = "plot",  # Align with entire plot area
       plot.subtitle = element_text(
-        size = base_size * 1.1,
+        size = 14,  # Increased for better readability
         color = dof_colors$grey_dark,
         family = dof_font_subtitle,
         hjust = 0,  # Left-aligned like title
-        margin = margin(l = 0, b = 15)  # Increased bottom margin for more space
+        margin = margin(l = 0, b = 15),  # Increased bottom margin for more space
+        lineheight = 1.2  # Standardized lineheight
       ),
       plot.subtitle.position = "plot",  # Align with entire plot area
       
@@ -169,7 +192,7 @@ theme_dof <- function(base_size = 12, border = TRUE, border_color = NULL) {
       axis.title = element_blank(),  # Remove axis titles like 538
       axis.text = element_text(
         color = dof_colors$grey_dark,
-        size = base_size * 0.8,
+        size = 12,  # Fixed size for better readability
         family = dof_font_body
       ),
       axis.line = element_blank(),  # Remove axis lines like 538
@@ -194,25 +217,25 @@ theme_dof <- function(base_size = 12, border = TRUE, border_color = NULL) {
       # Legend styling with Poppins (538-inspired positioning)
       legend.title = element_text(
         color = dof_colors$secondary,
-        size = base_size * 0.9,
+        size = 12,  # Fixed size for consistency
         face = "bold",
         family = dof_font_body
       ),
       legend.text = element_text(
         color = dof_colors$grey_dark,
-        size = base_size * 0.8,
+        size = 11,  # Fixed size for readability
         family = dof_font_body
       ),
-      legend.position = "bottom",
+      legend.position = "top",  # Standardized to top position
       legend.direction = "horizontal",  # 538-style horizontal legend
       legend.box = "horizontal",
-      legend.margin = margin(t = 15),
+      legend.margin = margin(t = 5, b = 10),  # Adjusted margins for top position
       
       # Strip styling for facets with Poppins
       strip.text = element_text(
         color = dof_colors$white,
         face = "bold",
-        size = base_size * 0.9,
+        size = 12,  # Fixed size for consistency
         family = dof_font_body
       ),
       strip.background = element_rect(
@@ -221,7 +244,7 @@ theme_dof <- function(base_size = 12, border = TRUE, border_color = NULL) {
       ),
       
       # Adjusted plot margins to accommodate border and logo strip
-      plot.margin = margin(t = 25, r = 25, b = 80, l = 25)
+      plot.margin = margin(t = 20, r = 20, b = 60, l = 20)  # Reduced margins to use more space
     )
     
   return(base_theme)

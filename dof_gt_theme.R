@@ -5,7 +5,22 @@ library(gt)
 library(dplyr)
 
 # Require and source the main DoF theme (fail fast)
-if (file.exists("dof_theme.R")) {
+# Try to find dof_theme.R in the same directory as this file
+.dof_gt_dir <- tryCatch({
+  dirname(normalizePath(sys.frame(1)$ofile))
+}, error = function(e) {
+  # Fallback: check common locations
+  if (file.exists("../../dof_theme/dof_theme.R")) {
+    normalizePath("../../dof_theme")
+  } else {
+    getwd()
+  }
+})
+
+dof_theme_path <- file.path(.dof_gt_dir, "dof_theme.R")
+if (file.exists(dof_theme_path)) {
+  source(dof_theme_path)
+} else if (file.exists("dof_theme.R")) {
   source("dof_theme.R")
 } else if (file.exists("../dof_theme.R")) {
   source("../dof_theme.R")
