@@ -169,7 +169,7 @@ theme_dof <- function(base_size = 12, border = TRUE, border_color = NULL) {
       # Text styling with DoF font hierarchy
       text = element_text(color = dof_colors$secondary, family = dof_font_body),
       plot.title = element_text(
-        size = 24,  # Much larger for better readability
+        size = 36,  # UX-focused large size for readability
         color = dof_colors$secondary,
         face = "bold",
         family = dof_font_title,
@@ -179,20 +179,24 @@ theme_dof <- function(base_size = 12, border = TRUE, border_color = NULL) {
       ),
       plot.title.position = "plot",  # Align with entire plot area
       plot.subtitle = element_text(
-        size = 14,  # Increased for better readability
+        size = 20,  # UX-focused size for readability
         color = dof_colors$grey_dark,
         family = dof_font_subtitle,
         hjust = 0,  # Left-aligned like title
         margin = margin(l = 0, b = 15),  # Increased bottom margin for more space
-        lineheight = 1.2  # Standardized lineheight
+        lineheight = 1.0  # Tighter lineheight to reduce spacing
       ),
       plot.subtitle.position = "plot",  # Align with entire plot area
       
        # Axis styling with Poppins (538-inspired: minimal approach)
-      axis.title = element_blank(),  # Remove axis titles like 538
+      axis.title = element_text(
+        size = 16,  # UX-focused size if re-enabled
+        color = dof_colors$grey_dark,
+        family = dof_font_body
+      ),
       axis.text = element_text(
         color = dof_colors$grey_dark,
-        size = 12,  # Fixed size for better readability
+        size = 16,  # UX-focused size for better readability
         family = dof_font_body
       ),
       axis.line = element_blank(),  # Remove axis lines like 538
@@ -217,13 +221,13 @@ theme_dof <- function(base_size = 12, border = TRUE, border_color = NULL) {
       # Legend styling with Poppins (538-inspired positioning)
       legend.title = element_text(
         color = dof_colors$secondary,
-        size = 12,  # Fixed size for consistency
+        size = 14,  # UX-focused size for consistency
         face = "bold",
         family = dof_font_body
       ),
       legend.text = element_text(
         color = dof_colors$grey_dark,
-        size = 11,  # Fixed size for readability
+        size = 14,  # UX-focused size for readability
         family = dof_font_body
       ),
       legend.position = "top",  # Standardized to top position
@@ -243,8 +247,8 @@ theme_dof <- function(base_size = 12, border = TRUE, border_color = NULL) {
         color = NA
       ),
       
-      # Adjusted plot margins to accommodate border and logo strip
-      plot.margin = margin(t = 20, r = 20, b = 60, l = 20)  # Reduced margins to use more space
+      # Adjusted plot margins
+      plot.margin = margin(t = 20, r = 20, b = 20, l = 20)  # Equal margins all around
     )
     
   return(base_theme)
@@ -353,7 +357,15 @@ create_dof_container <- function(plot,
                                  border_width = 9,
                                  width = NULL,              # Auto-detect if NULL
                                  height = NULL,             # Auto-detect if NULL
-                                  dpi = 150) {               # Higher DPI for better quality
+                                 dpi = 150,                 # Higher DPI for better quality
+                                 strip_position = c("bottom", "top"),  # allow top/bottom strip
+                                 y_nudge = 0,               # fine-tune vertical alignment
+                                 fallback_text = NULL,      # fallback text if logos missing
+                                 qr_path = NULL,            # optional QR image path (PNG)
+                                 qr_link = NULL,            # optional URL to encode (if QR generator available)
+                                 qr_size = 36,              # QR rendered size in px (square)
+                                 qr_margin = 15,            # right margin for QR in px
+                                 logo_gap = 10) {           # gap between QR and wordmark
   
   # Validate inputs
   if (!is_ggplot(plot)) {
@@ -381,6 +393,9 @@ create_dof_container <- function(plot,
     height <- max(height, 400)
   }
   
+  # Match/validate strip position
+  strip_position <- match.arg(strip_position)
+
   # Set colors (accept named keys like "accent" or hex strings)
   strip_color <- resolve_dof_color(strip_color, default = dof_colors$primary)
   border_color <- resolve_dof_color(border_color, default = dof_colors$primary)
@@ -436,7 +451,11 @@ create_dof_container <- function(plot,
     # Add logo strip if requested
     if (logo_strip) {
       canvas <- add_dof_logo_strip_image(canvas, logo_path, icon_path, strip_color, 
-                                         strip_height_px, width, logo_color, icon_color)
+                                         strip_height_px, width, logo_color, icon_color,
+                                         strip_position = strip_position, y_nudge = y_nudge,
+                                         fallback_text = fallback_text,
+                                         qr_path = qr_path, qr_link = qr_link, qr_size = qr_size,
+                                         qr_margin = qr_margin, logo_gap = logo_gap)
     }
     
     # Add border if requested
@@ -461,7 +480,10 @@ create_dof_container <- function(plot,
 add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL, 
                                     strip_color = NULL, strip_height_px = 45, 
                                     canvas_width = 1200, logo_color = "primary", 
-                                    icon_color = "primary") {
+                                    icon_color = "primary", strip_position = c("bottom", "top"),
+                                    y_nudge = 0, fallback_text = NULL,
+                                    qr_path = NULL, qr_link = NULL, qr_size = 36,
+                                    qr_margin = 15, logo_gap = 10) {
   
   # Validate inputs
   if (!requireNamespace("magick", quietly = TRUE)) {
@@ -469,6 +491,9 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
     return(canvas)
   }
   
+  # Validate strip position
+  strip_position <- match.arg(strip_position)
+
   # Set default strip color
   if (is.null(strip_color)) {
     strip_color <- dof_colors$primary
@@ -487,7 +512,7 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
     file_color <- color_map[[tolower(color)]]
     if (is.null(file_color)) file_color <- "Primary Color"  # fallback
     
-    if (asset_type == "logo") {
+  if (asset_type == "logo") {
       search_patterns <- c(
         paste0("*", file_color, "*"),
         paste0("*Horizontal*", file_color, "*"),
@@ -498,12 +523,17 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
         "logo*"
       )
       search_dirs <- c(
+        # Absolute (relative to this theme file)
+        file.path(.dof_theme_dir, "assets/brand/wordmark/horizontal"),
+        file.path(.dof_theme_dir, "assets/brand/wordmark"),
         # New preferred structure
         "assets/brand/wordmark/horizontal",
         "../assets/brand/wordmark/horizontal",
         "assets/brand/wordmark",
         "../assets/brand/wordmark",
         # Backward compatibility with previous layouts
+        file.path(.dof_theme_dir, "images/Wordmark/03_Horizontal Layout"),
+        file.path(.dof_theme_dir, "images/Wordmark"),
         "images/Wordmark/03_Horizontal Layout",
         "../images/Wordmark/03_Horizontal Layout", 
         "Images/Wordmark/03_Horizontal Layout",
@@ -516,6 +546,7 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
         "../images",
         "Images",
         "../Images",
+        file.path(.dof_theme_dir, "assets/images"),
         "assets/images",
         "../assets/images"
       )
@@ -528,10 +559,13 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
         "icon*"
       )
       search_dirs <- c(
+        # Absolute (relative to this theme file)
+        file.path(.dof_theme_dir, "assets/brand/icon"),
         # New preferred structure
         "assets/brand/icon",
         "../assets/brand/icon",
         # Backward compatibility with previous layouts
+        file.path(.dof_theme_dir, "images/Icon"),
         "images/Icon",
         "../images/Icon",
         "Images/Icon",
@@ -540,6 +574,7 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
         "../images",
         "Images",
         "../Images",
+        file.path(.dof_theme_dir, "assets/images"),
         "assets/images",
         "../assets/images"
       )
@@ -556,6 +591,26 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
       }
     }
     return(NULL)
+  }
+
+  # Find QR image path if not provided
+  find_qr_path <- function() {
+    search_dirs <- c(
+      file.path(.dof_theme_dir, "assets/brand/qr"),
+      file.path(.dof_theme_dir, "assets/qr"),
+      "assets/brand/qr", "../assets/brand/qr",
+      "assets/qr", "../assets/qr",
+      file.path(.dof_theme_dir, "images/QR"),
+      "images/QR", "../images/QR",
+      "images", "../images"
+    )
+    for (dir in search_dirs) {
+      if (dir.exists(dir)) {
+        files <- list.files(dir, pattern = "qr|code", ignore.case = TRUE, full.names = TRUE)
+        if (length(files) > 0) return(files[1])
+      }
+    }
+    NULL
   }
   
   # Auto-detect logo path with color-specific fallbacks
@@ -592,10 +647,7 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
     actual_icon_height <- resized_icon_info$height
     
     # Calculate vertical center position using actual image height
-    icon_y <- round((strip_height_px - actual_icon_height) / 2)
-    
-    # Add 3px downward adjustment to better center visually
-    icon_y <- icon_y + 3
+    icon_y <- round((strip_height_px - actual_icon_height) / 2) + y_nudge
     
     # Ensure minimum offset to prevent clipping
     icon_y <- max(icon_y, 1)
@@ -605,7 +657,39 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
                                offset = paste0("+", icon_margin, "+", icon_y))
   }
   
-  # Add logo on the right if available
+  # Prepare optional QR image on the far right
+  qr_img <- NULL
+  qr_x <- NULL
+  if (!is.null(qr_path) && file.exists(qr_path)) {
+    qr_img <- magick::image_read(qr_path)
+  } else if (!is.null(qr_link)) {
+    # Best-effort generation if qrcode + png available; otherwise silently skip
+    try({
+      if (requireNamespace("qrcode", quietly = TRUE) && requireNamespace("png", quietly = TRUE)) {
+        m <- qrcode::qr_code(qr_link, ecl = "M")
+        tf <- tempfile(fileext = ".png")
+        png::writePNG(1 - m, tf)  # invert for black modules on white
+        qr_img <- magick::image_read(tf)
+        unlink(tf)
+      }
+    }, silent = TRUE)
+  }
+  if (is.null(qr_img)) {
+    # Try to discover a QR in assets
+    auto_qr <- find_qr_path()
+    if (!is.null(auto_qr) && file.exists(auto_qr)) {
+      qr_img <- magick::image_read(auto_qr)
+    }
+  }
+  if (!is.null(qr_img)) {
+    qr_img <- magick::image_resize(qr_img, paste0(qr_size, "x", qr_size, "!"))
+    qr_x <- canvas_width - qr_size - qr_margin
+    qr_y <- max(round((strip_height_px - qr_size) / 2) + y_nudge, 1)
+    strip_bg <- magick::image_composite(strip_bg, qr_img,
+                                        offset = paste0("+", qr_x, "+", qr_y))
+  }
+
+  # Add logo on the right (or to the left of QR if present)
   if (file.exists(logo_path)) {
     logo_img <- magick::image_read(logo_path)
     
@@ -622,10 +706,10 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
     
     # Calculate positions (right-aligned and vertically centered using actual dimensions)
     logo_x <- canvas_width - actual_logo_width - logo_margin
-    logo_y <- round((strip_height_px - actual_logo_height) / 2)
-    
-    # Add 3px downward adjustment to better center visually
-    logo_y <- logo_y + 3
+    if (!is.null(qr_x)) {
+      logo_x <- qr_x - logo_gap - actual_logo_width
+    }
+    logo_y <- round((strip_height_px - actual_logo_height) / 2) + y_nudge
     
     # Ensure minimum offset to prevent clipping
     logo_y <- max(logo_y, 1)
@@ -638,12 +722,19 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
     warning("Logo file not found.")
   }
   
+  # If both assets missing and fallback text provided, annotate the strip
+  if (!file.exists(logo_path) && !file.exists(icon_path) && !is.null(fallback_text)) {
+    strip_bg <- magick::image_annotate(strip_bg, text = fallback_text,
+                                       color = dof_colors$secondary, size = 14,
+                                       gravity = "west", location = "+15+0")
+  }
+
   # Get canvas dimensions
   canvas_info <- magick::image_info(canvas)
   canvas_height <- canvas_info$height
   
-  # Calculate position for logo strip (bottom of canvas)
-  strip_y <- canvas_height - strip_height_px
+  # Calculate position for logo strip (bottom or top of canvas)
+  strip_y <- if (strip_position == "bottom") (canvas_height - strip_height_px) else 0
   
   # Composite the logo strip onto the bottom of the canvas
   result <- magick::image_composite(canvas, strip_bg, 
@@ -654,7 +745,11 @@ add_dof_logo_strip_image <- function(canvas, logo_path = NULL, icon_path = NULL,
 
 # Backward compatibility function - now uses image-based approach
 add_dof_logo_strip <- function(plot, logo_path = NULL, strip_height = 0.075, 
-                               strip_color = NULL, width = 1200, height = 800) {
+                               strip_color = NULL, width = 1200, height = 800,
+                               strip_position = c("bottom", "top"), y_nudge = 0,
+                               fallback_text = NULL, icon_path = NULL,
+                               logo_color = "primary", icon_color = "primary") {
+  strip_position <- match.arg(strip_position)
   # Convert strip_height proportion to pixels
   strip_height_px <- round(height * strip_height)
   
@@ -662,8 +757,14 @@ add_dof_logo_strip <- function(plot, logo_path = NULL, strip_height = 0.075,
     plot = plot,
     logo_strip = TRUE,
     logo_path = logo_path,
+    icon_path = icon_path,
+    logo_color = logo_color,
+    icon_color = icon_color,
     strip_height_px = strip_height_px,
     strip_color = strip_color,
+    strip_position = strip_position,
+    y_nudge = y_nudge,
+    fallback_text = fallback_text,
     width = width,
     height = height
   )
@@ -763,12 +864,17 @@ create_dof_example_chart <- function(save_path = NULL) {
       )
     )
   
-  # Create the image-based container with logo strip
-  result_image <- create_dof_container(p, width = 1200, height = 800)
+  # Create the image-based container with logo strip + QR
+  result_image <- create_dof_container(
+    p,
+    width = 1200,
+    height = 800,
+    qr_link = "https://www.deconstructoroffun.com"
+  )
   
   # Save if path provided
   if (!is.null(save_path)) {
-    image_write(result_image, save_path)
+    magick::image_write(result_image, save_path)
     cat("Chart with border and logo strip saved as '", save_path, "'\n", sep = "")
   }
   
@@ -844,12 +950,17 @@ create_dof_line_chart <- function(save_path = NULL) {
       axis.text.x = element_text(angle = 45, hjust = 1)
     )
   
-  # Create the image-based container with logo strip
-  result_image <- create_dof_container(p, width = 1200, height = 800)
+  # Create the image-based container with logo strip + QR
+  result_image <- create_dof_container(
+    p,
+    width = 1200,
+    height = 800,
+    qr_link = "https://www.deconstructoroffun.com"
+  )
   
   # Save if path provided
   if (!is.null(save_path)) {
-    image_write(result_image, save_path)
+    magick::image_write(result_image, save_path)
     cat("Line chart with border and logo strip saved as '", save_path, "'\\n", sep = "")
   }
   
@@ -921,12 +1032,17 @@ create_dof_stacked_chart <- function(save_path = NULL) {
       panel.grid.major.y = element_blank()
     )
   
-  # Create the image-based container with logo strip
-  result_image <- create_dof_container(p, width = 1200, height = 800)
+  # Create the image-based container with logo strip + QR
+  result_image <- create_dof_container(
+    p,
+    width = 1200,
+    height = 800,
+    qr_link = "https://www.deconstructoroffun.com"
+  )
   
   # Save if path provided
   if (!is.null(save_path)) {
-    image_write(result_image, save_path)
+    magick::image_write(result_image, save_path)
     cat("Stacked bar chart with border and logo strip saved as '", save_path, "'\\n", sep = "")
   }
   
@@ -981,12 +1097,17 @@ create_dof_100_stacked_chart <- function(save_path = NULL) {
       )
     )
   
-  # Create the image-based container with logo strip
-  result_image <- create_dof_container(p, width = 1200, height = 800)
+  # Create the image-based container with logo strip + QR
+  result_image <- create_dof_container(
+    p,
+    width = 1200,
+    height = 800,
+    qr_link = "https://www.deconstructoroffun.com"
+  )
   
   # Save if path provided
   if (!is.null(save_path)) {
-    image_write(result_image, save_path)
+    magick::image_write(result_image, save_path)
     cat("100% stacked bar chart with border and logo strip saved as '", save_path, "'\\n", sep = "")
   }
   

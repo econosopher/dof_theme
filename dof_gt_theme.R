@@ -48,7 +48,15 @@ embed_agrandir_css <- function() {
 
 # Helper function to find DoF icon path
 find_dof_icon_path <- function() {
+  # Also consider absolute paths relative to both the GT and theme directories
+  abs_dirs <- c(
+    file.path(.dof_gt_dir, "assets/brand/icon"),
+    if (exists(".dof_theme_dir")) file.path(.dof_theme_dir, "assets/brand/icon") else NULL,
+    file.path(.dof_gt_dir, "images/Icon"),
+    if (exists(".dof_theme_dir")) file.path(.dof_theme_dir, "images/Icon") else NULL
+  )
   search_dirs <- c(
+    abs_dirs,
     # New preferred structure
     "assets/brand/icon",
     "../assets/brand/icon",

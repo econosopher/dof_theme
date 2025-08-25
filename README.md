@@ -96,7 +96,15 @@ create_dof_container(
   icon_color = "primary",         # Icon color options
   container_border = TRUE,        # Add pink border
   border_width = 9,               # Border thickness in pixels
-  strip_height_px = 45           # Logo strip height
+  strip_height_px = 45,           # Logo strip height
+  strip_position = "bottom",      # New: place strip at top or bottom
+  y_nudge = 0,                    # New: fine-tune vertical alignment of logos
+  fallback_text = NULL,           # New: text used if logos are missing
+  # QR code options
+  qr_path = NULL,                 # Provide a PNG of a QR code (recommended)
+  qr_link = NULL,                 # Or a URL to encode (requires 'qrcode' + 'png')
+  qr_size = 36,                   # Square QR size in px
+  qr_margin = 15                  # Right margin for QR in px
 )
 ```
 
@@ -190,6 +198,13 @@ ggplot(data, aes(x = date, y = revenue)) +
 - No axis titles (538 style)
 - Pink container border (9px)
 - Logo strip at bottom (45px)
+
+### Logo assets note
+
+- If you source the theme files directly from GitHub, logo image assets are not downloaded.
+- Either clone the repo (assets live under `assets/brand/...`) or pass explicit paths via `logo_path`/`icon_path`.
+- The theme now searches both the working directory and the theme’s own directory, so cloned repos work from anywhere.
+- If logos aren’t available, you can set `fallback_text = "Deconstructor of Fun"` to render branded text in the strip.
 
 ## Examples Gallery
 
